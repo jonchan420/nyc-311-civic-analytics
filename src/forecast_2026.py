@@ -50,6 +50,15 @@ def main(model_name: str = "gradient_boosting", end_month: str = "2026-12-01") -
     monthly["month"] = pd.to_datetime(monthly["month"])
     history = monthly.sort_values("month")[["month", "complaint_count"]].copy()
 
+    # same incomplete-month guard as build_forecast_dataset.py: this script
+    # reads monthly_citywide_counts.parquet directly, so it needs its own
+    # check rather than inheriting the one applied to the training data.
+    trailing_avg = history["complaint_count"].iloc[-13:-1].mean()
+    if history["complaint_count"].iloc[-1] < 0.85 * trailing_avg:
+        dropped = history["month"].iloc[-1]
+        history = history.iloc[:-1].copy()
+        print(f"Dropped {dropped.date()} as a likely-incomplete month.")
+
     last_month = history["month"].max()
     forecast_dates = pd.date_range(
         start=last_month + pd.offsets.MonthBegin(1),
