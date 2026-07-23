@@ -101,9 +101,18 @@ def main() -> None:
         retrain = pd.concat([train, validation])
         linear.fit(retrain[FEATURES], retrain["complaint_count"])
         boosted.fit(retrain[FEATURES], retrain["complaint_count"])
+        test_results: dict[str, dict[str, float]] = {}
+        test_results["baseline_seasonal_lag12"] = evaluate(
+            test["complaint_count"], test["lag_12"].to_numpy()
+        )
         for name, model in [("linear_regression", linear), ("gradient_boosting", boosted)]:
             pred = np.maximum(model.predict(test[FEATURES]), 0)
-            print(f"  {name}: {evaluate(test['complaint_count'], pred)}")
+            test_results[name] = evaluate(test["complaint_count"], pred)
+            print(f"  {name}: {test_results[name]}")
+        test_summary = pd.DataFrame(test_results).T
+        test_summary.to_csv(PROCESSED_DIR / "model_comparison_test_2026.csv")
+        print(f"Test months covered: {test['month'].min().date()} to {test['month'].max().date()}")
+        print(f"Saved to model_comparison_test_2026.csv")
 
     joblib.dump(boosted, MODEL_DIR / "gradient_boosting.joblib")
     joblib.dump(linear, MODEL_DIR / "linear_regression.joblib")
