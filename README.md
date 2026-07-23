@@ -1,15 +1,14 @@
 # NYC 311 Civic Analytics and Complaint Forecasting
 
+> I turned a classroom visualization assignment into a reproducible
+> civic analytics and forecasting pipeline that processes more than
+> 21.9 million NYC 311 records and evaluates predictions honestly as
+> new city data arrives.
+
 End-to-end civic analytics project analyzing NYC 311 service requests
 (2020–present): exploratory analysis, population-adjusted borough
 comparisons, and monthly complaint-volume forecasting with honest
 baseline comparisons, presented through a Streamlit dashboard.
-
-This project began as an EST 389 (Intro to Responsible AI and Data
-Science) exploratory analysis of one year of 311 data. It was later
-expanded into a full pipeline with API-based incremental updates,
-time-series forecasting, and frozen-forecast evaluation against
-incoming 2026 data.
 
 Every number below traces to a file in this repo — either
 `data/processed/model_comparison*.csv`, a frozen forecast in
@@ -18,11 +17,62 @@ Every number below traces to a file in this repo — either
 `src/anomaly_analysis.py`. None of it was hand-typed from a terminal
 scrollback.
 
+## Motivation
+
+This project began as an EST 389 (Intro to Responsible AI and Data
+Science) class assignment: clean and visualize one year of NYC 311
+complaint data. I originally picked NYC 311 because the dataset was
+large and I wanted real experience working with public data at scale.
+I later expanded it into a full pipeline covering more than 21.9
+million records (21,890,525, per `data/raw/parquet_by_year/`) from
+2020 through 2026.
+
+It's also personally motivated. I regularly notice sanitation issues
+in my own neighborhood — trash left on the street that doesn't get
+picked up — and I once witnessed a robbery involving Chinese elders
+in broad daylight in Chinatown. Experiences like that made me think
+about how public data, reporting systems, and policy decisions affect
+the safety and quality of life of New Yorkers, and about who gets
+heard by those systems and who doesn't.
+
+I was also encouraged by seeing city leadership use complaint data to
+respond to visible issues like potholes — proof that public data
+drives real action when agencies interpret and act on it well. I hope
+projects like this can surface insights that support better policy
+and help make New York City a better place.
+
+### Why civic analytics
+
+I care about improving NYC and was curious what was hidden inside
+millions of 311 complaints. Specifically, I wanted to understand:
+
+- what residents actually report
+- how complaints vary across boroughs
+- which issues follow seasonal patterns
+- how raw totals can create misleading impressions
+- whether historical data can forecast future complaint volume
+
+## Project evolution
+
+- **EST 389 (class project).** One year of 311 data, exploratory
+  analysis and visualization, in `notebooks/` and `report/` (not yet
+  restored to this repo — see Repository structure below).
+- **Portfolio expansion.** The same question asked at real scale:
+  2020–present, 21.9M+ records, a memory-safe DuckDB/Parquet
+  pipeline, population-adjusted comparisons, baseline-vs-ML
+  forecasting, frozen predictions scored against real incoming data,
+  and a Streamlit dashboard.
+- **What stayed the same.** The core question — what do 311 complaints
+  actually tell you, and what do they not — is the same question the
+  class project asked. The scale and rigor changed; the concern about
+  reporting bias didn't.
+
 ## Key design decisions
 
-- **DuckDB for the 14 GB raw CSV.** The raw export is converted once
-  to yearly Parquet partitions in a single streaming pass. No pandas
-  chunking, no memory pressure, and the raw CSV is never read again.
+- **DuckDB for the 14 GB raw CSV (21.9M+ rows).** The raw export is
+  converted once to yearly Parquet partitions in a single streaming
+  pass. No pandas chunking, no memory pressure, and the raw CSV is
+  never read again.
 - **Incremental updates via the Socrata API.** Only records newer than
   the local maximum date are ever downloaded.
 - **Baselines before models — and the result is honestly mixed.**
@@ -45,7 +95,7 @@ scrollback.
   `data/processed/anomaly_findings/`. Anyone cloning this repo can
   regenerate every figure in the anomaly section below.
 - **Reporting bias is documented, not ignored.** 311 data measures who
-  reports, not where conditions are worst.
+  reports, not where conditions are worst — see Data responsibility.
 
 ## Setup (macOS)
 
@@ -116,7 +166,59 @@ Borough populations from the 2020 US Census, in
 | Bronx | 1,472,654 |
 | Staten Island | 495,747 |
 
-## Model performance
+## Population normalization: the equity flip
+
+Source: `data/processed/borough_per_capita.parquet`, built by
+`src/per_capita_analysis.py`.
+
+My original class analysis showed Brooklyn with the highest total
+complaint count — unsurprising, since Brooklyn is also the most
+populous borough:
+
+| Borough | Total complaints (2020–2026) | Population | Complaints per 100k |
+|---|---|---|---|
+| Brooklyn | 6,555,048 | 2,736,074 | 239,579 |
+| Queens | 5,256,588 | 2,405,464 | 218,527 |
+| Bronx | 4,669,395 | 1,472,654 | **317,073** |
+| Manhattan | 4,409,687 | 1,694,251 | 260,274 |
+| Staten Island | 921,370 | 495,747 | 185,855 |
+
+Adjusted for population, the ranking flips: the **Bronx** has the
+highest complaint rate per 100,000 residents, despite having the
+second-smallest population and only the third-highest raw total of
+the five boroughs. Raw totals mostly track population size;
+per-capita rates surface a different pattern entirely.
+
+This normalization still has limits — complaint locations can involve
+commuters, tourists, and people reporting problems outside the
+borough where they live, and it says nothing about *why* the Bronx
+rate is higher (see Data responsibility below).
+
+## Machine learning, in plain English
+
+Four methods are compared, from simplest to most complex:
+
+- **Previous-month baseline.** Predicts next month by copying the
+  most recent completed month. If June had 330,000 complaints, it
+  predicts July will too. Reacts fast to recent shifts, but ignores
+  yearly seasonality entirely.
+- **Seasonal lag-12 baseline.** Predicts a month using the same month
+  from the previous year — July 2026 is predicted from July 2025.
+  Works well when the year-over-year pattern repeats: heating
+  complaints rise every winter, noise complaints rise every summer.
+- **Linear regression.** Fits a weighted equation linking the target
+  to engineered features (recent lags, rolling averages, month
+  encodings). Simple and easy to explain, e.g. "higher recent volume
+  predicts higher next-month volume" — but it can't easily represent
+  sudden or nonlinear shifts.
+- **Gradient boosting.** Builds a sequence of small decision trees,
+  each one correcting the errors of the trees before it. Can capture
+  interactions a linear model can't — e.g. "a winter month with a
+  given recent-count level behaves differently than a summer month at
+  the same level" — but with only ~60–70 monthly observations to
+  train on, it has more room to overfit than the simpler methods.
+
+### Model performance
 
 Source: `data/processed/model_comparison.csv` (validation, 2025) and
 `data/processed/model_comparison_test_2026.csv` (test, six complete
@@ -131,6 +233,9 @@ months of 2026: Jan–Jun).
 | linear_regression | 22,294 | 27,713 | 7.19% | 7.32% |
 | baseline_previous_month | 25,911 | 34,513 | 8.82% | 8.51% |
 
+2025 followed stable, repeating seasonal patterns, so copying the
+matching month from 2024 was hard to beat.
+
 **Test (2026 Jan–Jun) — the trained models win instead:**
 
 | model | MAE | RMSE | MAPE | WAPE |
@@ -139,30 +244,44 @@ months of 2026: Jan–Jun).
 | gradient_boosting | 25,630 | 31,660 | 7.55% | 7.71% |
 | baseline_seasonal_lag12 | 39,295 | 46,693 | 11.84% | 11.82% |
 
-The reversal is the finding: 2026 is not a normal year (see the
-structural break below), and a baseline that can only repeat last
-year's number has no mechanism to track a regime change. The trained
-models, which see recent lags and rolling means, absorb some of it.
+Early 2026 did not follow 2025 as closely — snow, street-condition,
+illegal-parking, and reporting-channel changes (see below) pushed
+volume above the prior year. The seasonal baseline could only repeat
+last year's number; the trained models could partially react because
+they see recent lags and rolling averages. That reversal — not a
+flat "ML wins" — is the actual finding.
+
+**What these models predict.** All four predict how many complaints
+will be *recorded* by NYC 311 — not actual crime, not actual
+neighborhood safety, not actual infrastructure quality, and not how
+many problems truly exist. Reporting depends on awareness, language
+access, technology access, and trust in government, on top of
+whatever is actually happening on the ground (see Data responsibility).
 
 ## Frozen forecasts
 
 `data/forecasts/` holds every forecast ever generated, never
 overwritten. Two generation bugs were found and fixed here rather
-than hidden:
+than hidden — a debugging lesson worth keeping visible rather than
+quietly patched:
 
-- **Gradient boosting v1/v2 → v3.** `forecast_2026_gradient_boosting_20260722_1857.csv`
-  and `..._1916.csv` are byte-identical in their predictions — only
-  the timestamp changed between them. Both claimed
+- **Gradient boosting v1/v2 → v3 — partial-month contamination.**
+  `forecast_2026_gradient_boosting_20260722_1857.csv` and
+  `..._1916.csv` are byte-identical in their predictions — only the
+  timestamp changed between them. Both claimed
   `training_end_month = 2026-07`, but `forecast_2026.py` read
   `monthly_citywide_counts.parquet` directly, bypassing the
   incomplete-month guard that `build_forecast_dataset.py` applies to
   training data. July 2026 had 226,542 rows at generation time — about
-  70% of a normal month — so both files' `lag_1` was anchored on a
-  partial month. `forecast_2026.py` now applies the same guard.
-  `..._2058.csv` is the corrected version: `training_end_month =
-  2026-06`, forecasting July onward instead of August onward. v1 and
-  v2 are kept, not deleted, per the frozen-forecast policy — they are
-  superseded for anchor contamination, not erased.
+  70% of a normal month, since the snapshot only covered dates through
+  July 21 — so both files' `lag_1` was anchored on an artificially low
+  partial month, which then propagated into every subsequent
+  recursive prediction. `forecast_2026.py` now applies the same
+  guard. `..._2058.csv` is the corrected version:
+  `training_end_month = 2026-06`, forecasting July onward instead of
+  August onward. v1 and v2 are kept, not deleted, per the
+  frozen-forecast policy — they are superseded for anchor
+  contamination, not erased.
 - **Seasonal-naive baseline was lag-24, not lag-12.**
   `forecast_2026_seasonal_naive_20260722_baseline.csv` has no
   generating script in `src/` and its six predictions turn out to
@@ -242,18 +361,86 @@ but a shift in *how* and *where* complaints arrive (source:
   these two boroughs went from 31,195 (2024) to 34,011 (2025, +9.0%)
   to 40,066 (2026, +17.8%) — an accelerating trend, not a reversal.
 
+These findings establish coincident timing and count differences, not
+causation — see Limitations.
+
 ## Data responsibility
 
-_[To be written by the project author — this is the intellectual
-core of the EST 389 analysis and should reflect their own reasoning
-about what 311 volume does and doesn't measure, not a generated
-summary.]_
+311 complaint counts are not a direct measurement of actual
+neighborhood conditions. The Bronx's higher per-capita rate above
+doesn't, by itself, tell you the Bronx has more underlying problems —
+it could equally reflect more reporting.
 
-## Motivation
+Some neighborhoods report more because residents have greater
+awareness of 311, stronger language access, better internet or
+smartphone access, more confidence navigating government systems, or
+more time and resources to file a report and follow up. Some elderly
+Asian residents and other immigrant communities in neighborhoods like
+Chinatown may not know 311 exists, may not know how to use it, or may
+face language and technology barriers that keep them from reporting
+even serious problems. That means a neighborhood with *fewer* recorded
+complaints can still have serious unmet needs — silence in this
+dataset is not evidence of safety.
 
-_[To be written by the project author — the personal observations
-(Chinatown, Brooklyn infrastructure) that motivated this project in
-the first place aren't something a script or model can produce.]_
+In short, every number in this dataset is a mix of:
+
+- actual conditions
+- awareness of 311
+- technology access
+- language access
+- trust in government
+- willingness to report
+
+Because of that mix, city agencies should not allocate resources
+based on raw (or even per-capita) complaint totals alone. The
+forecasting models in this project predict recorded 311 volume — a
+proxy shaped by all of the above — not the true rate of neighborhood
+problems, crime, or infrastructure failure.
+
+## Lessons learned
+
+- **Raw totals can mislead.** Brooklyn leads on raw complaint count
+  because it has the most people, not necessarily the most problems;
+  the per-capita view flips the ranking entirely.
+- **Simpler models can outperform complex ones.** The seasonal-naive
+  baseline beat both trained models on 2025 validation — a finding
+  worth reporting honestly, not explaining away.
+- **Validation results can flip under a structural break.** The same
+  baseline that won in 2025 lost badly on 2026 test data once the
+  year stopped following the prior year's pattern.
+- **Partial months silently contaminate lag features.** A forecast
+  script reading raw monthly aggregates directly, without the
+  incomplete-month guard applied elsewhere in the pipeline, anchored
+  its first prediction on a July that was only ~70% complete.
+- **Predictions have to be preserved before the actuals arrive**, or
+  "the model predicted this" becomes unverifiable after the fact —
+  which is the entire reason frozen forecasts exist here.
+- **Public complaint data measures reporting as well as conditions.**
+  Every count in this project is a joint signal of what's actually
+  happening and who chose, or was able, to report it.
+
+## Future work
+
+The current models forecast monthly totals from historical complaint
+patterns alone. They have no way to know in advance about one-off
+events that can move volume within a month — a Knicks playoff run and
+celebration, World Cup matches, concerts, parades, major storms,
+transit disruptions, or large public gatherings. At monthly
+resolution, a short, sharp event like this is easy to miss: a few
+days of elevated noise or sanitation complaints just blend into the
+month's total.
+
+A future version could move from monthly to **daily** forecasting and
+merge in external event/weather datasets, with features such as:
+
+- `is_knicks_game_day`, `is_knicks_playoff_game`
+- `is_world_cup_match_day`, `distance_to_stadium`
+- `daily_precipitation`, `snowfall`, `temperature`
+- `is_holiday`, `is_major_event_day`
+
+Daily aggregation would be a prerequisite, not an add-on — at monthly
+granularity, a two-day spike from a parade or a storm is invisible
+next to ~300,000 baseline complaints.
 
 ## Limitations
 
