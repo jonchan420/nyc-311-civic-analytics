@@ -1,0 +1,23 @@
+# data files never go to github
+data/raw/
+data/processed/
+*.csv
+!data/borough_population.csv
+!data/forecasts/*.csv
+*.parquet
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# models
+models/*.joblib
+
+# os
+.DS_Store
+
+# vs code
+.vscode/
