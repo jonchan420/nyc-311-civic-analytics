@@ -1,5 +1,10 @@
 # NYC 311 Civic Analytics and Complaint Forecasting
 
+**Live dashboard: https://nyc-311-civic-analytics.streamlit.app** —
+updates itself monthly as new city data arrives and forecasts are
+scored. (Free hosting sleeps when idle; if you see a wake-up button,
+it takes about 30 seconds.)
+
 > I turned a classroom visualization assignment into a reproducible
 > civic analytics and forecasting pipeline that processes more than
 > 22.6 million NYC 311 records and evaluates predictions honestly as
