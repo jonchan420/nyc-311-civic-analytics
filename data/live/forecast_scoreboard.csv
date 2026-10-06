@@ -1,0 +1,14 @@
+month,model_name,source_file,training_end_month,forecast_created_at,months_ahead,predicted_count,actual_count,error,pct_error,in_track_record,superseded
+2026-07,gradient_boosting,forecast_2026_gradient_boosting_20260722_2058.csv,2026-06,2026-07-22T20:58:06,1,321586.0,343123,-21537.0,-6.28,True,False
+2026-07,seasonal_naive,forecast_2026_seasonal_naive_20260722_2106.csv,2026-06,2026-07-22T21:06:54,1,315877.0,343123,-27246.0,-7.94,True,False
+2026-07,seasonal_naive,forecast_2026_seasonal_naive_20260722_baseline.csv,2026-06,2026-07-22T19:47:29,1,298936.0,343123,-44187.0,-12.88,False,True
+2026-08,gradient_boosting,forecast_2026_gradient_boosting_20260722_1857.csv,2026-07,2026-07-22T18:57:57,1,299252.0,328905,-29653.0,-9.02,False,True
+2026-08,gradient_boosting,forecast_2026_gradient_boosting_20260722_1916.csv,2026-07,2026-07-22T19:16:46,1,299252.0,328905,-29653.0,-9.02,False,True
+2026-08,gradient_boosting,forecast_2026_gradient_boosting_20260722_2058.csv,2026-06,2026-07-22T20:58:06,2,312489.0,328905,-16416.0,-4.99,True,False
+2026-08,seasonal_naive,forecast_2026_seasonal_naive_20260722_2106.csv,2026-06,2026-07-22T21:06:54,2,304038.0,328905,-24867.0,-7.56,True,False
+2026-08,seasonal_naive,forecast_2026_seasonal_naive_20260722_baseline.csv,2026-06,2026-07-22T19:47:29,2,284823.0,328905,-44082.0,-13.4,False,True
+2026-09,gradient_boosting,forecast_2026_gradient_boosting_20260722_1857.csv,2026-07,2026-07-22T18:57:57,2,304043.0,323614,-19571.0,-6.05,False,True
+2026-09,gradient_boosting,forecast_2026_gradient_boosting_20260722_1916.csv,2026-07,2026-07-22T19:16:46,2,304043.0,323614,-19571.0,-6.05,False,True
+2026-09,gradient_boosting,forecast_2026_gradient_boosting_20260722_2058.csv,2026-06,2026-07-22T20:58:06,3,312489.0,323614,-11125.0,-3.44,True,False
+2026-09,seasonal_naive,forecast_2026_seasonal_naive_20260722_2106.csv,2026-06,2026-07-22T21:06:54,3,302684.0,323614,-20930.0,-6.47,True,False
+2026-09,seasonal_naive,forecast_2026_seasonal_naive_20260722_baseline.csv,2026-06,2026-07-22T19:47:29,3,306770.0,323614,-16844.0,-5.2,False,True
