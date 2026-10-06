@@ -4,9 +4,8 @@ Creates lag features, rolling means, and cyclical month encodings.
 Critical detail: rolling means use .shift(1) first so the current
 month's target never leaks into its own features.
 
-Also drops the final month if it looks incomplete (a month whose
-count is drastically below trend is almost always a partial month
-from the data snapshot, not a real drop).
+Uses only complete months (see src/monthly_data.py), so a partial
+month from a data snapshot never enters training.
 
 Run:
     python src/build_forecast_dataset.py
@@ -22,20 +21,11 @@ import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from config.settings import PROCESSED_DIR
+from src.monthly_data import load_monthly_counts
 
 
 def build() -> pd.DataFrame:
-    monthly = pd.read_parquet(PROCESSED_DIR / "monthly_citywide_counts.parquet")
-    monthly["month"] = pd.to_datetime(monthly["month"])
-    monthly = monthly.sort_values("month").reset_index(drop=True)
-
-    # drop the last month if it's likely incomplete:
-    # below 60% of the trailing 12-month average is a red flag.
-    trailing_avg = monthly["complaint_count"].iloc[-13:-1].mean()
-    if monthly["complaint_count"].iloc[-1] < 0.85 * trailing_avg:
-        dropped = monthly["month"].iloc[-1]
-        monthly = monthly.iloc[:-1].copy()
-        print(f"Dropped {dropped.date()} as a likely-incomplete month.")
+    monthly = load_monthly_counts()[["month", "complaint_count"]].copy()
 
     monthly["year"] = monthly["month"].dt.year
     monthly["month_number"] = monthly["month"].dt.month

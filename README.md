@@ -75,6 +75,10 @@ millions of 311 complaints. Specifically, I wanted to understand:
   never read again.
 - **Incremental updates via the Socrata API.** Only records newer than
   the local maximum date are ever downloaded.
+- **Automated monthly forecasting.** A GitHub Action pulls complete-month
+  aggregates straight from the API (no raw data needed), scores every
+  frozen forecast, freezes the next ones, and commits the results — so
+  the forecast track record builds itself, publicly, in git history.
 - **Baselines before models — and the result is honestly mixed.**
   On the 2025 validation split, the seasonal-naive baseline
   (same month, one year prior) beats both trained models on every
@@ -120,27 +124,43 @@ python src/build_monthly_counts.py     # 3. small aggregate tables
 python src/per_capita_analysis.py      # 4. population-adjusted comparison
 python src/build_forecast_dataset.py   # 5. lag/rolling feature table
 python src/train_evaluate.py           # 6. baselines vs models
-python src/forecast_2026.py            # 7. freeze a 2026 GB forecast
-python src/forecast_seasonal_naive.py  # 8. freeze a 2026 seasonal-naive forecast
+python src/forecast_2026.py            # 7. freeze a 3-month GB forecast
+python src/forecast_seasonal_naive.py  # 8. freeze a 3-month seasonal-naive forecast
 python src/anomaly_analysis.py         # 9. record-level findings behind the 2026 break
 streamlit run dashboard/app.py         # 10. dashboard
 ```
 
-Monthly refresh:
+Monthly refresh runs automatically (see "Live, automated forecasting"
+below). To run the same steps by hand, with no raw data needed:
 
 ```bash
-python src/update_from_api.py          # fetch only new records
-python src/build_monthly_counts.py     # rebuild aggregates
+python src/refresh_live.py             # complete-month aggregates from the API -> data/live/
+python src/score_forecasts.py          # score every frozen forecast -> data/live/forecast_scoreboard.csv
+python src/build_forecast_dataset.py   # then retrain and freeze the next forecasts
+python src/train_evaluate.py
+python src/forecast_2026.py
+python src/forecast_seasonal_naive.py
+```
+
+To refresh the local record-level data instead (needed for
+`anomaly_analysis.py`):
+
+```bash
+python src/update_from_api.py          # fetch only new raw records
+python src/build_monthly_counts.py     # rebuild local aggregates
 ```
 
 ## Repository structure
 
 ```
+.github/workflows/          monthly refresh, scoring, and forecast freezing
 config/                     paths and constants
 data/raw/                   yearly Parquet partitions (gitignored)
 data/processed/             small aggregate tables (gitignored)
 data/processed/anomaly_findings/  record-level findings, output of anomaly_analysis.py (gitignored)
+data/live/                  API aggregates + forecast scoreboard, refreshed monthly (tracked in git)
 data/forecasts/             frozen, timestamped forecast files (tracked in git)
+data/forecasts/superseded.csv  which frozen files are excluded from scoring, and why
 data/borough_population.csv 2020 Census borough populations (tracked in git)
 src/                        pipeline scripts, numbered by run order above
 dashboard/                  Streamlit app
@@ -222,7 +242,9 @@ Four methods are compared, from simplest to most complex:
 
 Source: `data/processed/model_comparison.csv` (validation, 2025) and
 `data/processed/model_comparison_test_2026.csv` (test, six complete
-months of 2026: Jan–Jun).
+months of 2026: Jan–Jun), as produced by the July 22, 2026 run.
+`train_evaluate.py`'s test set grows as months complete, so re-running
+it later extends the test window past June.
 
 **Validation (2025) — a baseline wins:**
 

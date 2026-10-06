@@ -1,0 +1,58 @@
+name: Monthly refresh
+
+# Runs on the 5th so the previous month is fully published on NYC Open Data
+# (the API lags 1-2 days). refresh_live.py refuses to run if it isn't.
+on:
+  schedule:
+    - cron: "0 15 5 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monthly-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Refresh monthly counts from the NYC Open Data API
+        env:
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
+        run: python src/refresh_live.py
+
+      - name: Score existing frozen forecasts
+        run: python src/score_forecasts.py
+
+      - name: Retrain and freeze next forecasts
+        run: |
+          python src/build_forecast_dataset.py
+          python src/train_evaluate.py
+          python src/forecast_2026.py
+          python src/forecast_seasonal_naive.py
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/live data/forecasts
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+          else
+            month=$(python -c "import json; print(json.load(open('data/live/metadata.json'))['complete_through'])")
+            git commit -m "Monthly refresh: actuals through ${month}, new frozen forecasts"
+            git push
+          fi

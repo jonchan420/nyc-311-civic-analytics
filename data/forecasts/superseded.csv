@@ -1,0 +1,4 @@
+source_file,reason
+forecast_2026_gradient_boosting_20260722_1857.csv,lag_1 anchored on partial July 2026 (226542 rows); replaced by forecast_2026_gradient_boosting_20260722_2058.csv
+forecast_2026_gradient_boosting_20260722_1916.csv,lag_1 anchored on partial July 2026 (226542 rows); replaced by forecast_2026_gradient_boosting_20260722_2058.csv
+forecast_2026_seasonal_naive_20260722_baseline.csv,used lag-24 (2024 values) instead of lag-12; replaced by forecast_2026_seasonal_naive_20260722_2106.csv

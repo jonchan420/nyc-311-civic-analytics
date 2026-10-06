@@ -8,10 +8,13 @@ DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 FORECAST_DIR = DATA_DIR / "forecasts"
+# written only by src/refresh_live.py (API aggregates, complete months only)
+# and committed, so the GitHub Action and deployed dashboard need no raw data
+LIVE_DIR = DATA_DIR / "live"
 MODEL_DIR = PROJECT_ROOT / "models"
 VISUAL_DIR = PROJECT_ROOT / "visuals"
 
-for directory in [RAW_DIR, PROCESSED_DIR, FORECAST_DIR, MODEL_DIR, VISUAL_DIR]:
+for directory in [RAW_DIR, PROCESSED_DIR, FORECAST_DIR, LIVE_DIR, MODEL_DIR, VISUAL_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 # path to the raw 14 GB csv you downloaded.

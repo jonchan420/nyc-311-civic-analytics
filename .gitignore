@@ -5,6 +5,9 @@ data/processed/
 !data/borough_population.csv
 !data/forecasts/*.csv
 *.parquet
+# small API aggregates, refreshed monthly by .github/workflows/monthly-refresh.yml
+!data/live/*.csv
+!data/live/*.parquet
 
 # python
 __pycache__/

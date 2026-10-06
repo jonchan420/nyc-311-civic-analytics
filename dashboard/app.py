@@ -6,6 +6,7 @@ Run from the project root:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -14,28 +15,58 @@ import plotly.express as px
 import streamlit as st
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from config.settings import FORECAST_DIR, PROCESSED_DIR
+from config.settings import LIVE_DIR, PROCESSED_DIR
+from src.forecast_registry import load_forecasts, score, summarize
+from src.monthly_data import load_monthly_counts
 
 st.set_page_config(page_title="NYC 311 Civic Analytics", layout="wide")
 st.title("NYC 311 Civic Analytics and Complaint Forecasting")
 
 
-@st.cache_data
+def prefer_live(live_name: str, processed_name: str) -> Path:
+    # data/live/ is committed and refreshed monthly by the GitHub Action;
+    # data/processed/ only exists on a machine that ran the full local pipeline
+    live = LIVE_DIR / live_name
+    return live if live.exists() else PROCESSED_DIR / processed_name
+
+
+def read_table(path: Path) -> pd.DataFrame:
+    return pd.read_csv(path) if path.suffix == ".csv" else pd.read_parquet(path)
+
+
+@st.cache_data(ttl=3600)
 def load_monthly() -> pd.DataFrame:
-    df = pd.read_parquet(PROCESSED_DIR / "monthly_citywide_counts.parquet")
-    df["month"] = pd.to_datetime(df["month"])
-    return df.sort_values("month")
+    return load_monthly_counts(verbose=False)
 
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_borough_category() -> pd.DataFrame:
-    df = pd.read_parquet(PROCESSED_DIR / "monthly_borough_category.parquet")
+    df = read_table(prefer_live("monthly_borough_category.parquet",
+                                "monthly_borough_category.parquet"))
     df["month"] = pd.to_datetime(df["month"])
     return df
 
 
+@st.cache_data(ttl=3600)
+def load_per_capita() -> pd.DataFrame | None:
+    path = prefer_live("borough_per_capita.csv", "borough_per_capita.parquet")
+    return read_table(path) if path.exists() else None
+
+
+@st.cache_data(ttl=3600)
+def load_refresh_info() -> dict | None:
+    path = LIVE_DIR / "metadata.json"
+    return json.loads(path.read_text()) if path.exists() else None
+
+
 monthly = load_monthly()
 borough_cat = load_borough_category()
+refresh_info = load_refresh_info()
+if refresh_info:
+    st.caption(
+        f"Data complete through {pd.Timestamp(refresh_info['complete_through']):%B %Y} · "
+        f"refreshed automatically from NYC Open Data on {refresh_info['refreshed_at'][:10]}"
+    )
 
 tab_overview, tab_trends, tab_forecast, tab_ethics = st.tabs(
     ["Overview", "Trends", "Forecast vs actual", "Data responsibility"]
@@ -53,9 +84,8 @@ with tab_overview:
     )
     col3.metric("Highest-volume borough (raw)", top_borough.title())
 
-    per_capita_path = PROCESSED_DIR / "borough_per_capita.parquet"
-    if per_capita_path.exists():
-        per_capita = pd.read_parquet(per_capita_path)
+    per_capita = load_per_capita()
+    if per_capita is not None:
         st.subheader("The Equity Flip: Raw Volumes vs. Population-Adjusted Metrics")
         
         # Split layout into side-by-side view to emphasize the structural data flip
@@ -73,7 +103,7 @@ with tab_overview:
             st.plotly_chart(fig_raw, use_container_width=True)
             
         with chart_col2:
-            st.markdown("#### Normalized Per 100k Population (BronX Leads)")
+            st.markdown("#### Normalized Per 100k Population (Bronx Leads)")
             fig_pc = px.bar(
                 per_capita.sort_values("complaints_per_100k"),
                 x="complaints_per_100k", y="borough", orientation="h",
@@ -108,112 +138,88 @@ with tab_trends:
     st.plotly_chart(fig, use_container_width=True)
 
 with tab_forecast:
-    st.subheader("Frozen forecasts vs actual 2026 data")
-    forecast_files = sorted(FORECAST_DIR.glob("forecast_2026_*.csv"))
-    if not forecast_files:
+    st.subheader("Forecast track record")
+    forecasts = load_forecasts()
+    if forecasts.empty:
         st.info("No forecasts yet. Run src/forecast_2026.py first.")
     else:
-        all_forecasts = []
-        for f in forecast_files:
-            df = pd.read_csv(f, parse_dates=["month"])
-            df["source_file"] = f.name
-            all_forecasts.append(df)
-        all_forecasts = pd.concat(all_forecasts, ignore_index=True)
-
-        # The active comparison uses each model's most recently frozen
-        # file. Older files (superseded runs, e.g. the lag-1 contamination
-        # fix) stay on disk per the never-overwrite policy and are listed
-        # separately below, not silently dropped.
-        latest_stamp = all_forecasts.groupby("model_name")["forecast_created_at"].transform("max")
-        current = all_forecasts[all_forecasts["forecast_created_at"] == latest_stamp].copy()
-
-        # Same incomplete-month guard used throughout the pipeline: the most
-        # recent month in monthly_citywide_counts.parquet is often a partial
-        # snapshot, not a finished month. Scoring a forecast against a
-        # partial actual would misleadingly show every model "missing badly."
-        actual_history = monthly.sort_values("month").reset_index(drop=True)
-        trailing_avg = actual_history["complaint_count"].iloc[-13:-1].mean()
-        incomplete_month = None
-        if actual_history["complaint_count"].iloc[-1] < 0.85 * trailing_avg:
-            incomplete_month = actual_history["month"].iloc[-1]
-            actual_history = actual_history.iloc[:-1]
-        actual = actual_history.rename(columns={"complaint_count": "actual_count"})
-
-        if incomplete_month is not None:
-            st.caption(
-                f"{incomplete_month:%b %Y} excluded from the actuals below — "
-                "that month's data snapshot is still partial, so it isn't a "
-                "fair comparison against a full-month forecast yet."
-            )
-
-        predicted_rows = current[["month", "predicted_count", "model_name"]].rename(
-            columns={"predicted_count": "complaints", "model_name": "series"}
+        st.caption(
+            "Every forecast is frozen with a timestamp before its months happen and is "
+            "never edited. For each month, the track record uses the most recent "
+            "forecast that existed in advance (superseded buggy files excluded)."
         )
-        actual_rows = actual[actual["month"] >= current["month"].min()][
-            ["month", "actual_count"]
-        ].rename(columns={"actual_count": "complaints"})
-        actual_rows["series"] = "actual"
-        plot_df = pd.concat(
-            [predicted_rows[["month", "complaints", "series"]], actual_rows],
-            ignore_index=True,
-        ).dropna(subset=["complaints"])
+        scored = score(forecasts, monthly)
+        track = scored[scored["in_track_record"]]
+        last_actual = monthly["month"].max()
 
-        fig = px.line(plot_df, x="month", y="complaints", color="series", markers=True)
+        active = forecasts[~forecasts["superseded"]]
+        newest = active.groupby("model_name")["training_end_month"].transform("max")
+        upcoming = active[(active["training_end_month"] == newest)
+                          & (active["month"] > last_actual)]
+
+        predicted_rows = pd.concat([
+            track[["month", "model_name", "predicted_count"]],
+            upcoming[["month", "model_name", "predicted_count"]],
+        ]).rename(columns={"model_name": "series", "predicted_count": "complaints"})
+        actual_rows = monthly[monthly["month"] >= predicted_rows["month"].min()].rename(
+            columns={"complaint_count": "complaints"})
+        actual_rows["series"] = "actual"
+        plot_df = pd.concat([predicted_rows, actual_rows[["month", "complaints", "series"]]])
+
+        fig = px.line(plot_df.sort_values("month"), x="month", y="complaints",
+                      color="series", markers=True)
         fig.update_xaxes(dtick="M1", tickformat="%b %Y")
+        if not upcoming.empty:
+            fig.add_vline(x=last_actual + pd.Timedelta(days=15), line_dash="dot",
+                          line_color="gray")
         st.plotly_chart(fig, use_container_width=True)
 
-        scored = current.merge(actual, on="month", how="inner").dropna(subset=["actual_count"])
-        if len(scored) > 0:
-            scored["abs_error"] = (scored["actual_count"] - scored["predicted_count"]).abs()
-            scored["pct_error"] = (
-                (scored["predicted_count"] - scored["actual_count"]) / scored["actual_count"] * 100
-            )
-
-            st.markdown("#### Per-model accuracy on completed months")
-            summary = (
-                scored.groupby("model_name")
-                .apply(lambda g: pd.Series({
-                    "months_scored": len(g),
-                    "MAE": round(g["abs_error"].mean()),
-                    "MAPE": f"{g['pct_error'].abs().mean():.1f}%",
-                    "WAPE": f"{g['abs_error'].sum() / g['actual_count'].sum() * 100:.1f}%",
-                }), include_groups=False)
-                .reset_index()
-                .rename(columns={"model_name": "model"})
-            )
+        if track.empty:
+            st.info("No forecast months have actual counts yet.")
+        else:
+            st.markdown("#### Accuracy so far")
+            summary = summarize(track)
+            for column in ["MAPE", "WAPE"]:
+                summary[column] = summary[column].map(lambda v: f"{v:.2f}%")
             st.dataframe(summary, hide_index=True, use_container_width=True)
 
-            st.markdown("#### Month-by-month: which forecast was closer")
-            month_pivot = scored.pivot(index="month", columns="model_name", values="abs_error")
-            month_pivot["closer_model"] = month_pivot.idxmin(axis=1)
-            month_pivot.index = month_pivot.index.strftime("%b %Y")
-            st.dataframe(month_pivot.reset_index(), hide_index=True, use_container_width=True)
-        else:
-            st.info("No completed months yet to score the active forecasts against.")
+            st.markdown("#### Month by month: which forecast was closer")
+            by_month = track.pivot(index="month", columns="model_name", values="pct_error")
+            by_month["closer_model"] = by_month.abs().idxmin(axis=1)
+            by_month["actual"] = track.groupby("month")["actual_count"].first()
+            by_month.index = by_month.index.strftime("%b %Y")
+            st.dataframe(
+                by_month.reset_index().style.format(
+                    {c: "{:+.1f}%" for c in by_month.columns if c not in ("closer_model", "actual")}
+                    | {"actual": "{:,.0f}"}),
+                hide_index=True, use_container_width=True,
+            )
+            st.caption("Percent error: negative means the forecast was too low.")
 
-        st.markdown("#### Active forecast metadata")
-        meta = (
-            current[["model_name", "training_end_month", "forecast_created_at", "source_file"]]
-            .drop_duplicates()
-            .sort_values("model_name")
-        )
-        st.dataframe(meta, hide_index=True, use_container_width=True)
+        if not upcoming.empty:
+            st.markdown("#### Next months (frozen, not yet scorable)")
+            next_table = upcoming.pivot(index="month", columns="model_name",
+                                        values="predicted_count")
+            next_table.index = next_table.index.strftime("%b %Y")
+            st.dataframe(next_table.reset_index().style.format(
+                {c: "{:,.0f}" for c in next_table.columns}),
+                hide_index=True, use_container_width=True)
 
-        with st.expander("Superseded forecast versions (kept per frozen-forecast policy)"):
-            older = all_forecasts[~all_forecasts["source_file"].isin(current["source_file"])]
-            if len(older) > 0:
-                st.dataframe(
-                    older[["source_file", "model_name", "training_end_month", "forecast_created_at"]]
-                    .drop_duplicates()
-                    .sort_values(["model_name", "forecast_created_at"]),
-                    hide_index=True, use_container_width=True,
-                )
-                st.caption(
-                    "These files are never edited or deleted — see the README's "
-                    "'Frozen forecasts' section for why each was superseded."
-                )
-            else:
-                st.caption("No superseded versions on disk yet.")
+        with st.expander("Every frozen forecast file, including superseded ones"):
+            files = (
+                forecasts.groupby("source_file")
+                .agg(model=("model_name", "first"),
+                     training_end_month=("training_end_month", "first"),
+                     created_at=("forecast_created_at", "first"),
+                     superseded_because=("reason", "first"))
+                .reset_index()
+                .sort_values("created_at")
+            )
+            files["training_end_month"] = files["training_end_month"].dt.strftime("%Y-%m")
+            files["superseded_because"] = files["superseded_because"].fillna("")
+            st.dataframe(files, hide_index=True, use_container_width=True)
+            st.caption("Superseded files are kept unedited; the README's 'Frozen "
+                       "forecasts' section explains each bug.")
 
 with tab_ethics:
     st.subheader("What this data can and cannot tell you")
