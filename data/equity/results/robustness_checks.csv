@@ -1,0 +1,116 @@
+check,dropped,term,label,pct_change_per_10pts,ci_low_pct,ci_high_pct,p_value,n
+main,,pct_lep_spanish,Limited-English households: Spanish,-5.8753,-25.7681,19.3484,0.6152,173
+main,,pct_lep_chinese,Limited-English households: Chinese,-35.1818,-54.2063,-8.2539,0.0148,173
+main,,pct_lep_other_asian,Limited-English households: other Asian languages,-33.4081,-72.4769,61.1183,0.3648,173
+main,,pct_lep_other,Limited-English households: all other languages,-29.6752,-42.9959,-13.2419,0.0012,173
+main,,pct_age_65_plus,Residents 65+,60.9753,24.8582,107.54,0.0003,173
+main,,pct_no_internet,Households with no internet access,3.9511,-36.4545,70.0487,0.8766,173
+min_2500_renters,,pct_lep_spanish,Limited-English households: Spanish,-8.4811,-27.1992,15.0497,0.4452,161
+min_2500_renters,,pct_lep_chinese,Limited-English households: Chinese,-35.8875,-56.1899,-6.1766,0.0224,161
+min_2500_renters,,pct_lep_other_asian,Limited-English households: other Asian languages,-17.3221,-62.0205,79.9819,0.6296,161
+min_2500_renters,,pct_lep_other,Limited-English households: all other languages,-25.6973,-39.22,-9.1661,0.004,161
+min_2500_renters,,pct_age_65_plus,Residents 65+,48.2242,5.524,108.203,0.0235,161
+min_2500_renters,,pct_no_internet,Households with no internet access,-5.7967,-41.6613,52.1163,0.8058,161
+no_borough_effects,,pct_lep_spanish,Limited-English households: Spanish,3.6171,-15.9196,27.6934,0.7374,173
+no_borough_effects,,pct_lep_chinese,Limited-English households: Chinese,-36.7777,-57.5048,-5.9408,0.024,173
+no_borough_effects,,pct_lep_other_asian,Limited-English households: other Asian languages,-37.8055,-73.9396,48.4304,0.2826,173
+no_borough_effects,,pct_lep_other,Limited-English households: all other languages,-30.8978,-42.9938,-16.2352,0.0002,173
+no_borough_effects,,pct_age_65_plus,Residents 65+,58.7358,22.8284,105.1402,0.0005,173
+no_borough_effects,,pct_no_internet,Households with no internet access,7.4245,-37.9927,86.1078,0.7972,173
+plus_income_150k,,pct_income_150k,Households earning $150k+,-35.5202,-44.3683,-25.2648,0.0,173
+plus_income_150k,,pct_lep_spanish,Limited-English households: Spanish,-22.8078,-36.4626,-6.2185,0.0095,173
+plus_income_150k,,pct_lep_chinese,Limited-English households: Chinese,-30.725,-48.1741,-7.4012,0.0135,173
+plus_income_150k,,pct_lep_other_asian,Limited-English households: other Asian languages,-39.4009,-67.0374,11.4065,0.1062,173
+plus_income_150k,,pct_lep_other,Limited-English households: all other languages,-32.1661,-43.7784,-18.1552,0.0001,173
+plus_income_150k,,pct_age_65_plus,Residents 65+,11.7137,-11.7683,41.4453,0.3553,173
+plus_income_150k,,pct_no_internet,Households with no internet access,-19.676,-38.6248,5.1231,0.1098,173
+drop_one_borough,BRONX,pct_lep_spanish,Limited-English households: Spanish,0.8545,-23.2811,32.5831,0.951,149
+drop_one_borough,BRONX,pct_lep_chinese,Limited-English households: Chinese,-36.409,-54.8352,-10.4651,0.0099,149
+drop_one_borough,BRONX,pct_lep_other_asian,Limited-English households: other Asian languages,-39.8377,-76.4443,53.657,0.2858,149
+drop_one_borough,BRONX,pct_lep_other,Limited-English households: all other languages,-31.3723,-44.4259,-15.2525,0.0006,149
+drop_one_borough,BRONX,pct_age_65_plus,Residents 65+,64.5134,27.105,112.9314,0.0002,149
+drop_one_borough,BRONX,pct_no_internet,Households with no internet access,0.1744,-42.8353,75.5436,0.9951,149
+drop_one_borough,BROOKLYN,pct_lep_spanish,Limited-English households: Spanish,-11.5443,-32.1478,15.3157,0.3616,136
+drop_one_borough,BROOKLYN,pct_lep_chinese,Limited-English households: Chinese,-26.3315,-45.234,-0.9048,0.0435,136
+drop_one_borough,BROOKLYN,pct_lep_other_asian,Limited-English households: other Asian languages,-36.8055,-72.0118,42.6869,0.2668,136
+drop_one_borough,BROOKLYN,pct_lep_other,Limited-English households: all other languages,-12.051,-53.6855,67.011,0.6925,136
+drop_one_borough,BROOKLYN,pct_age_65_plus,Residents 65+,50.4782,14.6832,97.4457,0.0035,136
+drop_one_borough,BROOKLYN,pct_no_internet,Households with no internet access,26.5217,-19.0101,97.6511,0.2986,136
+drop_one_borough,MANHATTAN,pct_lep_spanish,Limited-English households: Spanish,-20.5295,-40.6966,6.4956,0.1227,129
+drop_one_borough,MANHATTAN,pct_lep_chinese,Limited-English households: Chinese,-26.3757,-49.0114,6.3087,0.1015,129
+drop_one_borough,MANHATTAN,pct_lep_other_asian,Limited-English households: other Asian languages,-55.3482,-84.945,32.4335,0.1446,129
+drop_one_borough,MANHATTAN,pct_lep_other,Limited-English households: all other languages,-25.6583,-40.0275,-7.8463,0.0072,129
+drop_one_borough,MANHATTAN,pct_age_65_plus,Residents 65+,46.5087,-21.6536,173.9732,0.2293,129
+drop_one_borough,MANHATTAN,pct_no_internet,Households with no internet access,-13.294,-50.1499,50.8108,0.6107,129
+drop_one_borough,QUEENS,pct_lep_spanish,Limited-English households: Spanish,12.578,-14.1447,47.6182,0.3879,116
+drop_one_borough,QUEENS,pct_lep_chinese,Limited-English households: Chinese,-55.9985,-64.7609,-45.0571,0.0,116
+drop_one_borough,QUEENS,pct_lep_other_asian,Limited-English households: other Asian languages,52.7633,-60.381,489.0253,0.5348,116
+drop_one_borough,QUEENS,pct_lep_other,Limited-English households: all other languages,-26.8529,-43.4545,-5.3772,0.0178,116
+drop_one_borough,QUEENS,pct_age_65_plus,Residents 65+,69.5446,32.2888,117.2926,0.0001,116
+drop_one_borough,QUEENS,pct_no_internet,Households with no internet access,22.8069,-30.7962,117.9293,0.479,116
+drop_one_borough,STATEN ISLAND,pct_lep_spanish,Limited-English households: Spanish,-5.5253,-25.9337,20.5064,0.6451,162
+drop_one_borough,STATEN ISLAND,pct_lep_chinese,Limited-English households: Chinese,-35.1189,-54.3755,-7.7349,0.0164,162
+drop_one_borough,STATEN ISLAND,pct_lep_other_asian,Limited-English households: other Asian languages,-33.3315,-72.7088,62.8614,0.3712,162
+drop_one_borough,STATEN ISLAND,pct_lep_other,Limited-English households: all other languages,-29.3525,-42.7517,-12.8171,0.0014,162
+drop_one_borough,STATEN ISLAND,pct_age_65_plus,Residents 65+,61.7004,25.1538,108.919,0.0003,162
+drop_one_borough,STATEN ISLAND,pct_no_internet,Households with no internet access,3.7422,-37.952,73.4537,0.8879,162
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill/Queensboro Hill (11355),pct_lep_spanish,Limited-English households: Spanish,-3.7468,-23.4182,20.9775,0.7419,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill/Queensboro Hill (11355),pct_lep_chinese,Limited-English households: Chinese,-44.2085,-56.9299,-27.7296,0.0,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill/Queensboro Hill (11355),pct_lep_other_asian,Limited-English households: other Asian languages,-18.9771,-65.1,88.1004,0.6223,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill/Queensboro Hill (11355),pct_lep_other,Limited-English households: all other languages,-27.878,-40.7319,-12.2362,0.0012,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill/Queensboro Hill (11355),pct_age_65_plus,Residents 65+,61.2813,25.4496,107.3475,0.0002,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill/Queensboro Hill (11355),pct_no_internet,Households with no internet access,4.0272,-34.9143,66.268,0.8681,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill (11354),pct_lep_spanish,Limited-English households: Spanish,-5.5634,-25.6914,20.0166,0.6378,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill (11354),pct_lep_chinese,Limited-English households: Chinese,-36.0029,-57.6904,-3.1987,0.0347,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill (11354),pct_lep_other_asian,Limited-English households: other Asian languages,-38.0497,-76.1097,60.6443,0.3224,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill (11354),pct_lep_other,Limited-English households: all other languages,-29.3896,-42.9747,-12.5683,0.0016,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill (11354),pct_age_65_plus,Residents 65+,60.5427,24.4455,107.1103,0.0003,172
+drop_one_high_chinese_lep_neighborhood,Flushing/Murray Hill (11354),pct_no_internet,Households with no internet access,4.2679,-36.3546,70.8182,0.8674,172
+drop_one_high_chinese_lep_neighborhood,Sunset Park (11220),pct_lep_spanish,Limited-English households: Spanish,-3.9124,-24.3583,22.06,0.7422,172
+drop_one_high_chinese_lep_neighborhood,Sunset Park (11220),pct_lep_chinese,Limited-English households: Chinese,-33.356,-54.1487,-3.1344,0.0336,172
+drop_one_high_chinese_lep_neighborhood,Sunset Park (11220),pct_lep_other_asian,Limited-English households: other Asian languages,-35.9935,-74.5655,61.0738,0.3411,172
+drop_one_high_chinese_lep_neighborhood,Sunset Park (11220),pct_lep_other,Limited-English households: all other languages,-30.0348,-43.4787,-13.3931,0.0012,172
+drop_one_high_chinese_lep_neighborhood,Sunset Park (11220),pct_age_65_plus,Residents 65+,61.0945,24.9635,107.672,0.0003,172
+drop_one_high_chinese_lep_neighborhood,Sunset Park (11220),pct_no_internet,Households with no internet access,2.9016,-37.3072,68.899,0.9094,172
+drop_one_high_chinese_lep_neighborhood,Chinatown/Lower East Side (10002),pct_lep_spanish,Limited-English households: Spanish,-6.6645,-26.4414,18.4296,0.5681,172
+drop_one_high_chinese_lep_neighborhood,Chinatown/Lower East Side (10002),pct_lep_chinese,Limited-English households: Chinese,-32.3316,-51.9682,-4.6672,0.0258,172
+drop_one_high_chinese_lep_neighborhood,Chinatown/Lower East Side (10002),pct_lep_other_asian,Limited-English households: other Asian languages,-37.5958,-74.6637,53.704,0.3031,172
+drop_one_high_chinese_lep_neighborhood,Chinatown/Lower East Side (10002),pct_lep_other,Limited-English households: all other languages,-29.7934,-43.1865,-13.2431,0.0012,172
+drop_one_high_chinese_lep_neighborhood,Chinatown/Lower East Side (10002),pct_age_65_plus,Residents 65+,62.1044,25.5756,109.2592,0.0003,172
+drop_one_high_chinese_lep_neighborhood,Chinatown/Lower East Side (10002),pct_no_internet,Households with no internet access,5.3989,-37.0756,76.5441,0.8407,172
+drop_one_high_chinese_lep_neighborhood,Bensonhurst/Mapleton (11204),pct_lep_spanish,Limited-English households: Spanish,-6.5739,-26.8233,19.279,0.5832,172
+drop_one_high_chinese_lep_neighborhood,Bensonhurst/Mapleton (11204),pct_lep_chinese,Limited-English households: Chinese,-34.3767,-53.7463,-6.8959,0.0186,172
+drop_one_high_chinese_lep_neighborhood,Bensonhurst/Mapleton (11204),pct_lep_other_asian,Limited-English households: other Asian languages,-33.7736,-72.5092,59.5418,0.356,172
+drop_one_high_chinese_lep_neighborhood,Bensonhurst/Mapleton (11204),pct_lep_other,Limited-English households: all other languages,-28.7464,-42.4037,-11.8507,0.002,172
+drop_one_high_chinese_lep_neighborhood,Bensonhurst/Mapleton (11204),pct_age_65_plus,Residents 65+,59.6781,22.6589,107.8698,0.0006,172
+drop_one_high_chinese_lep_neighborhood,Bensonhurst/Mapleton (11204),pct_no_internet,Households with no internet access,4.5009,-38.786,78.3977,0.871,172
+drop_one_high_chinese_lep_neighborhood,Bath Beach/Bensonhurst/Gravesend (11214),pct_lep_spanish,Limited-English households: Spanish,-5.8963,-25.7856,19.3234,0.6139,172
+drop_one_high_chinese_lep_neighborhood,Bath Beach/Bensonhurst/Gravesend (11214),pct_lep_chinese,Limited-English households: Chinese,-35.2832,-54.8406,-7.2561,0.0181,172
+drop_one_high_chinese_lep_neighborhood,Bath Beach/Bensonhurst/Gravesend (11214),pct_lep_other_asian,Limited-English households: other Asian languages,-33.3653,-72.5857,61.966,0.368,172
+drop_one_high_chinese_lep_neighborhood,Bath Beach/Bensonhurst/Gravesend (11214),pct_lep_other,Limited-English households: all other languages,-29.7923,-43.3483,-12.9926,0.0014,172
+drop_one_high_chinese_lep_neighborhood,Bath Beach/Bensonhurst/Gravesend (11214),pct_age_65_plus,Residents 65+,60.9804,24.84,107.5834,0.0003,172
+drop_one_high_chinese_lep_neighborhood,Bath Beach/Bensonhurst/Gravesend (11214),pct_no_internet,Households with no internet access,4.1478,-36.3419,70.3909,0.8707,172
+drop_one_high_chinese_lep_neighborhood,Hudson Square/Little Italy/SoHo/TriBeCa (10013),pct_lep_spanish,Limited-English households: Spanish,-5.8729,-25.9177,19.5955,0.6183,172
+drop_one_high_chinese_lep_neighborhood,Hudson Square/Little Italy/SoHo/TriBeCa (10013),pct_lep_chinese,Limited-English households: Chinese,-35.1871,-55.0809,-6.4826,0.0207,172
+drop_one_high_chinese_lep_neighborhood,Hudson Square/Little Italy/SoHo/TriBeCa (10013),pct_lep_other_asian,Limited-English households: other Asian languages,-33.4058,-72.667,62.2501,0.3686,172
+drop_one_high_chinese_lep_neighborhood,Hudson Square/Little Italy/SoHo/TriBeCa (10013),pct_lep_other,Limited-English households: all other languages,-29.6748,-43.0252,-13.196,0.0012,172
+drop_one_high_chinese_lep_neighborhood,Hudson Square/Little Italy/SoHo/TriBeCa (10013),pct_age_65_plus,Residents 65+,60.978,24.7551,107.7183,0.0003,172
+drop_one_high_chinese_lep_neighborhood,Hudson Square/Little Italy/SoHo/TriBeCa (10013),pct_no_internet,Households with no internet access,3.9455,-36.7523,70.831,0.8779,172
+drop_one_high_chinese_lep_neighborhood,Auburndale/Fresh Meadows/Pomonok/Utopia (11365),pct_lep_spanish,Limited-English households: Spanish,-5.8493,-25.7833,19.4388,0.6175,172
+drop_one_high_chinese_lep_neighborhood,Auburndale/Fresh Meadows/Pomonok/Utopia (11365),pct_lep_chinese,Limited-English households: Chinese,-34.6546,-54.0707,-7.0305,0.0183,172
+drop_one_high_chinese_lep_neighborhood,Auburndale/Fresh Meadows/Pomonok/Utopia (11365),pct_lep_other_asian,Limited-English households: other Asian languages,-33.6652,-72.5671,60.4026,0.3599,172
+drop_one_high_chinese_lep_neighborhood,Auburndale/Fresh Meadows/Pomonok/Utopia (11365),pct_lep_other,Limited-English households: all other languages,-29.6883,-43.034,-13.216,0.0012,172
+drop_one_high_chinese_lep_neighborhood,Auburndale/Fresh Meadows/Pomonok/Utopia (11365),pct_age_65_plus,Residents 65+,60.838,24.6828,107.4773,0.0003,172
+drop_one_high_chinese_lep_neighborhood,Auburndale/Fresh Meadows/Pomonok/Utopia (11365),pct_no_internet,Households with no internet access,4.0252,-36.3379,69.9794,0.8741,172
+drop_one_high_chinese_lep_neighborhood,College Point (11356),pct_lep_spanish,Limited-English households: Spanish,-6.359,-26.1386,18.7173,0.5852,172
+drop_one_high_chinese_lep_neighborhood,College Point (11356),pct_lep_chinese,Limited-English households: Chinese,-35.574,-54.9516,-7.861,0.0163,172
+drop_one_high_chinese_lep_neighborhood,College Point (11356),pct_lep_other_asian,Limited-English households: other Asian languages,-34.8539,-73.6906,61.3118,0.352,172
+drop_one_high_chinese_lep_neighborhood,College Point (11356),pct_lep_other,Limited-English households: all other languages,-29.7657,-43.0932,-13.3169,0.0011,172
+drop_one_high_chinese_lep_neighborhood,College Point (11356),pct_age_65_plus,Residents 65+,61.0967,24.9548,107.6924,0.0003,172
+drop_one_high_chinese_lep_neighborhood,College Point (11356),pct_no_internet,Households with no internet access,5.0372,-36.0503,72.5235,0.8452,172
+drop_one_high_chinese_lep_neighborhood,Bayside (South)/Oakland Gardens (11364),pct_lep_spanish,Limited-English households: Spanish,-6.0792,-25.9042,19.0501,0.6021,172
+drop_one_high_chinese_lep_neighborhood,Bayside (South)/Oakland Gardens (11364),pct_lep_chinese,Limited-English households: Chinese,-35.7156,-55.2065,-7.7437,0.0168,172
+drop_one_high_chinese_lep_neighborhood,Bayside (South)/Oakland Gardens (11364),pct_lep_other_asian,Limited-English households: other Asian languages,-36.1884,-74.3415,58.6964,0.3316,172
+drop_one_high_chinese_lep_neighborhood,Bayside (South)/Oakland Gardens (11364),pct_lep_other,Limited-English households: all other languages,-29.7457,-43.0114,-13.3922,0.0011,172
+drop_one_high_chinese_lep_neighborhood,Bayside (South)/Oakland Gardens (11364),pct_age_65_plus,Residents 65+,61.0026,24.9057,107.5313,0.0003,172
+drop_one_high_chinese_lep_neighborhood,Bayside (South)/Oakland Gardens (11364),pct_no_internet,Households with no internet access,3.0795,-36.8814,68.34,0.9029,172

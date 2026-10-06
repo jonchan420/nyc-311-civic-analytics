@@ -8,6 +8,9 @@ data/processed/
 # small API aggregates, refreshed monthly by .github/workflows/monthly-refresh.yml
 !data/live/*.csv
 !data/live/*.parquet
+# reporting-gap inputs and results (small; fetched once, reproducible)
+!data/equity/*.csv
+!data/equity/results/*.csv
 
 # python
 __pycache__/

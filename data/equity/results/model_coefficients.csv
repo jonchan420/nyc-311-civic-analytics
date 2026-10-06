@@ -1,0 +1,50 @@
+model,term,coef,se_hc3,ci_low,ci_high,p_value,n,r2,vif,pct_change_per_10pts,label
+need_only,const,3.940541,0.33176,3.285469,4.595614,0.0,173,0.568531,,1.2988342829774445e+19,
+need_only,pct_pre1950,0.020704,0.003143,0.014498,0.026909,0.0,173,0.568531,1.259446,23.002624,Renter units built before 1950
+need_only,pct_poverty,0.051779,0.008437,0.03512,0.068437,0.0,173,0.568531,1.850237,67.830715,Residents below poverty line
+need_only,pct_overcrowded,-0.003162,0.009543,-0.022006,0.015682,0.740841,173,0.568531,1.605152,-3.112297,Renter units with >1 person per room
+need_only,pct_small_building,0.001484,0.002832,-0.004107,0.007075,0.60089,173,0.568531,2.455957,1.495258,Renters in 1-4 unit buildings
+need_only,borough_BROOKLYN,-0.561034,0.15051,-0.858221,-0.263847,0.000266,173,0.568531,,-99.634017,
+need_only,borough_MANHATTAN,-0.702488,0.197068,-1.091606,-0.313369,0.000477,173,0.568531,,-99.911052,
+need_only,borough_QUEENS,-0.318588,0.160819,-0.63613,-0.001046,0.049259,173,0.568531,,-95.865824,
+need_only,borough_STATEN ISLAND,0.13751,0.186721,-0.231178,0.506197,0.462513,173,0.568531,,295.54561,
+need_plus_income,const,6.186153,0.528019,5.143514,7.228792,0.0,173,0.715278,,7.347163238404276e+28,
+need_plus_income,pct_pre1950,0.016764,0.002353,0.012117,0.021411,0.0,173,0.715278,1.312919,18.250895,Renter units built before 1950
+need_plus_income,pct_poverty,0.000731,0.01033,-0.019667,0.02113,0.943637,173,0.715278,3.719703,0.734165,Residents below poverty line
+need_plus_income,pct_overcrowded,-0.016602,0.008162,-0.03272,-0.000485,0.043573,173,0.715278,1.667696,-15.297306,Renter units with >1 person per room
+need_plus_income,pct_small_building,-0.000938,0.002352,-0.005582,0.003706,0.69052,173,0.715278,2.505389,-0.933736,Renters in 1-4 unit buildings
+need_plus_income,pct_income_150k,-0.039837,0.005975,-0.051636,-0.028038,0.0,173,0.715278,3.778913,-32.858659,Households earning $150k+
+need_plus_income,borough_BROOKLYN,-0.352527,0.124566,-0.598497,-0.106556,0.00524,173,0.715278,,-97.055605,
+need_plus_income,borough_MANHATTAN,-0.244657,0.16337,-0.567253,0.077938,0.136181,173,0.715278,,-91.341016,
+need_plus_income,borough_QUEENS,-0.428111,0.168341,-0.760521,-0.095702,0.011917,173,0.715278,,-98.617272,
+need_plus_income,borough_STATEN ISLAND,0.081646,0.20311,-0.319421,0.482713,0.688227,173,0.715278,,126.247351,
+need_plus_barriers,const,2.920888,0.391155,2.14832,3.693456,0.0,173,0.666259,,484456838335034.4,
+need_plus_barriers,pct_pre1950,0.019973,0.002873,0.014298,0.025647,0.0,173,0.666259,1.561473,22.106754,Renter units built before 1950
+need_plus_barriers,pct_poverty,0.057823,0.010094,0.037887,0.07776,0.0,173,0.666259,3.942165,78.288681,Residents below poverty line
+need_plus_barriers,pct_overcrowded,0.02591,0.011381,0.003431,0.048389,0.024157,173,0.666259,3.167214,29.575873,Renter units with >1 person per room
+need_plus_barriers,pct_small_building,-0.000555,0.00262,-0.005729,0.004619,0.832483,173,0.666259,2.667598,-0.553512,Renters in 1-4 unit buildings
+need_plus_barriers,pct_lep_spanish,-0.006055,0.012021,-0.029798,0.017688,0.615176,173,0.666259,3.461272,-5.875285,Limited-English households: Spanish
+need_plus_barriers,pct_lep_chinese,-0.043358,0.017591,-0.078102,-0.008615,0.014779,173,0.666259,1.516496,-35.18184,Limited-English households: Chinese
+need_plus_barriers,pct_lep_other_asian,-0.040659,0.044735,-0.129014,0.047697,0.364797,173,0.666259,1.698142,-33.408112,Limited-English households: other Asian languages
+need_plus_barriers,pct_lep_other,-0.035205,0.010632,-0.056205,-0.014205,0.001152,173,0.666259,2.098106,-29.675247,Limited-English households: all other languages
+need_plus_barriers,pct_age_65_plus,0.047608,0.012864,0.022201,0.073015,0.000296,173,0.666259,1.473015,60.975348,Residents 65+
+need_plus_barriers,pct_no_internet,0.003875,0.024919,-0.045341,0.053091,0.876618,173,0.666259,2.78032,3.951135,Households with no internet access
+need_plus_barriers,borough_BROOKLYN,-0.26609,0.181729,-0.625022,0.092841,0.145122,173,0.666259,,-93.011501,
+need_plus_barriers,borough_MANHATTAN,-0.505201,0.190108,-0.880681,-0.129721,0.008682,173,0.666259,,-99.360356,
+need_plus_barriers,borough_QUEENS,-0.0428,0.164575,-0.367851,0.282251,0.795154,173,0.666259,,-34.818753,
+need_plus_barriers,borough_STATEN ISLAND,0.419091,0.196271,0.031438,0.806745,0.034281,173,0.666259,,6508.311034,
+phone_share,const,37.602317,4.036504,29.62985,45.574785,0.0,173,0.443193,,,
+phone_share,pct_pre1950,-0.060619,0.037923,-0.13552,0.014282,0.111935,173,0.443193,1.561473,,Renter units built before 1950
+phone_share,pct_poverty,0.334178,0.120016,0.097135,0.57122,0.006017,173,0.443193,3.942165,,Residents below poverty line
+phone_share,pct_overcrowded,0.103366,0.144986,-0.182994,0.389726,0.476935,173,0.443193,3.167214,,Renter units with >1 person per room
+phone_share,pct_small_building,0.098753,0.030124,0.039255,0.158251,0.001285,173,0.443193,2.667598,,Renters in 1-4 unit buildings
+phone_share,pct_lep_spanish,-0.047304,0.12826,-0.300628,0.206021,0.712763,173,0.443193,3.461272,,Limited-English households: Spanish
+phone_share,pct_lep_chinese,-0.373877,0.182624,-0.734576,-0.013177,0.04229,173,0.443193,1.516496,,Limited-English households: Chinese
+phone_share,pct_lep_other_asian,-1.273083,0.609015,-2.475945,-0.070222,0.038183,173,0.443193,1.698142,,Limited-English households: other Asian languages
+phone_share,pct_lep_other,-0.027394,0.177962,-0.378885,0.324097,0.877861,173,0.443193,2.098106,,Limited-English households: all other languages
+phone_share,pct_age_65_plus,0.235833,0.12828,-0.017531,0.489198,0.067877,173,0.443193,1.473015,,Residents 65+
+phone_share,pct_no_internet,0.12637,0.199975,-0.2686,0.52134,0.528348,173,0.443193,2.78032,,Households with no internet access
+phone_share,borough_BROOKLYN,1.280543,2.146391,-2.958777,5.519863,0.551626,173,0.443193,,,
+phone_share,borough_MANHATTAN,0.010461,1.947577,-3.836183,3.857105,0.995721,173,0.443193,,,
+phone_share,borough_QUEENS,3.865254,2.105529,-0.293359,8.023867,0.068272,173,0.443193,,,
+phone_share,borough_STATEN ISLAND,5.049494,2.997314,-0.870478,10.969467,0.094026,173,0.443193,,,

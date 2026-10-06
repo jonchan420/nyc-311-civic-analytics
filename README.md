@@ -12,14 +12,15 @@ it takes about 30 seconds.)
 
 End-to-end civic analytics project analyzing NYC 311 service requests
 (2020–present): exploratory analysis, population-adjusted borough
-comparisons, and monthly complaint-volume forecasting with honest
-baseline comparisons, presented through a Streamlit dashboard.
+comparisons, monthly complaint-volume forecasting with honest
+baseline comparisons, and an analysis of which neighborhoods file
+fewer housing complaints than their housing conditions predict —
+presented through a Streamlit dashboard.
 
-Every number below traces to a file in this repo — either
-`data/processed/model_comparison*.csv`, a frozen forecast in
-`data/forecasts/`, or one of the CSVs in
-`data/processed/anomaly_findings/`, produced by
-`src/anomaly_analysis.py`. None of it was hand-typed from a terminal
+Every number below traces to a file in this repo — a model comparison
+table, a frozen forecast in `data/forecasts/`, the live scoreboard in
+`data/live/`, or a script's output in `data/processed/anomaly_findings/`
+or `data/equity/results/`. None of it was hand-typed from a terminal
 scrollback.
 
 ## Motivation
@@ -133,7 +134,9 @@ python src/train_evaluate.py           # 6. baselines vs models
 python src/forecast_2026.py            # 7. freeze a 3-month GB forecast
 python src/forecast_seasonal_naive.py  # 8. freeze a 3-month seasonal-naive forecast
 python src/anomaly_analysis.py         # 9. record-level findings behind the 2026 break
-streamlit run dashboard/app.py         # 10. dashboard
+python src/fetch_reporting_gap_data.py # 10. 311 + Census + boundaries -> data/equity/ (one-time, ~1 min)
+python src/reporting_gap_analysis.py   # 11. who files fewer complaints than housing predicts
+streamlit run dashboard/app.py         # 12. dashboard
 ```
 
 Monthly refresh runs automatically (see "Live, automated forecasting"
@@ -167,6 +170,8 @@ data/processed/anomaly_findings/  record-level findings, output of anomaly_analy
 data/live/                  API aggregates + forecast scoreboard, refreshed monthly (tracked in git)
 data/forecasts/             frozen, timestamped forecast files (tracked in git)
 data/forecasts/superseded.csv  which frozen files are excluded from scoring, and why
+data/equity/                311 + Census inputs and neighborhood boundaries (tracked in git)
+data/equity/results/        reporting-gap results and robustness checks (tracked in git)
 data/borough_population.csv 2020 Census borough populations (tracked in git)
 src/                        pipeline scripts, numbered by run order above
 dashboard/                  Streamlit app
@@ -441,6 +446,102 @@ but a shift in *how* and *where* complaints arrive (source:
 These findings establish coincident timing and count differences, not
 causation — see Limitations.
 
+## Who isn't being heard? The reporting-gap analysis
+
+![Map of housing complaints vs. what housing conditions predict](visuals/reporting_gap_map.png)
+
+The Data responsibility section below argues that some communities —
+including elderly Chinese-speaking residents like the ones I see in
+Chinatown — may report problems less often. This analysis tests that
+claim with data instead of asserting it. Sources:
+`src/fetch_reporting_gap_data.py` (inputs, `data/equity/`) and
+`src/reporting_gap_analysis.py` (results, `data/equity/results/`).
+
+**Design.** The unit is NYC Health's 177 Modified ZIP Code Tabulation
+Areas ("neighborhoods"); 173 have at least 1,000 renter households and
+are analyzed. The outcome is HPD housing-maintenance complaints (heat,
+plumbing, mold, leaks — 2,082,727 filed in 2022–2024) per 1,000
+renter households per year. Housing complaints are used because a
+tenant files them about their own building, so they land in the
+neighborhood where the reporter lives; street and noise complaints are
+often filed by commuters passing through. Census ACS 2020–2024
+estimates supply everything else, streamed from the Census Bureau's
+bulk files (no API key needed). Rules — sample, variables, model —
+were fixed before looking at results; the one later addition is
+labeled below.
+
+1. **Expected rate.** A regression predicts each neighborhood's
+   complaint rate from housing conditions only: share of renter units
+   built before 1950, poverty rate, overcrowding, share of renters in
+   1–4 unit buildings, and borough (R² 0.57). The gap is actual vs.
+   that prediction — the map above.
+2. **Barriers.** A second model adds limited-English households
+   (separately for Spanish, Chinese, other Asian languages, and all
+   other languages), residents 65+, and households with no internet.
+   Each barrier's coefficient shows how complaint rates differ between
+   neighborhoods with similar housing (robust HC3 standard errors,
+   verified against `statsmodels`).
+3. **Robustness.** Besides the main model, every barrier is re-fit 18
+   ways: dropping each borough, dropping each of the 10 most
+   Chinese-speaking neighborhoods, requiring 2,500+ renter households,
+   removing borough effects, and adding income — 19 fits in all
+   (`robustness_checks.csv`).
+
+**Results** (source: `data/equity/results/model_coefficients.csv` and
+`robustness_checks.csv`; effects are per +10 percentage points):
+
+| Barrier | Change in complaint rate | 95% CI | Robustness |
+|---|---|---|---|
+| Chinese limited-English households | **−35%** | −54% to −8% | negative in all 19 fits, significant in 18 |
+| All other limited-English languages | **−30%** | −43% to −13% | negative in all 19, significant in 18; gone without Brooklyn |
+| Spanish limited-English households | −6% | −26% to +19% | inconclusive: −23% (significant) only once income is added |
+| Other Asian languages | −33% | −72% to +61% | too few such households to tell |
+| No internet access | +4% | −36% to +70% | no relationship |
+| Residents 65+ | +61% | +25% to +108% | shrinks to +12%, not significant, once income is added |
+
+- **Chinatown shows up.** Chinatown/Lower East Side (10002) files 117
+  housing complaints per 1,000 renter households a year; its housing
+  conditions predict 295 — **60% fewer than expected**, the 9th-largest
+  shortfall of 173 neighborhoods (70% fewer and 3rd-largest once income
+  is also accounted for). Sunset Park (11220, −54%), Bensonhurst/Mapleton
+  (11204, −62%), and Bath Beach/Dyker Heights (11228, −58%) show the same
+  pattern; both Flushing neighborhoods are closer to expected (11354,
+  −25%; 11355, −13%).
+- **The Chinese-language association survives every check but one.**
+  With income added it is −31% (−48% to −7%); dropping Chinatown itself
+  it is −32%; it only loses significance when all of Manhattan is
+  removed (−26%, p = 0.10).
+- **The "other languages" result is not one community's story.** It is
+  concentrated in southern Brooklyn (Borough Park −73%, Gravesend/
+  Homecrest −39%), but the two neighborhoods with the most such
+  households — Russian-speaking Brighton Beach (+15%) and Coney Island
+  (+10%) — file more complaints than expected, not fewer.
+- **Two of my own expectations were wrong.** Older neighborhoods do not
+  report less; the apparent "more complaints" effect is mostly income.
+  And Chinese-speaking neighborhoods do not fall back on the phone line,
+  where 311 offers interpreters: their complaints come *less* often by
+  phone (−3.7 points of phone share per +10 points, p = 0.04).
+  Chinatown/LES files 34% of its housing complaints by phone vs. a 49%
+  neighborhood average.
+- **Not every shortfall is a barrier.** Several of the largest are
+  affluent, professionally managed areas — Long Island City (11109,
+  −83%), the Financial District (10006, −80%), Lincoln Square (10069,
+  −71%) — where repairs rarely go through 311. That is why income was
+  added as a check after the first results; it explains part of those
+  gaps but none of the Chinese-language association.
+
+**What this does and doesn't show.** These are associations across
+neighborhoods. A neighborhood can file fewer complaints because its
+housing is better than the Census can measure — for example, a
+different mix of rent-regulated buildings — not only because residents
+face barriers. And neighborhood averages can't show which households
+inside a neighborhood are or aren't reporting. What the data does
+show is consistent with the concern in Data responsibility: with
+similar housing conditions, neighborhoods with more Chinese-speaking
+households with limited English file markedly fewer housing complaints,
+so an agency allocating inspections by complaint volume would likely
+send fewer of them there.
+
 ## Data responsibility
 
 311 complaint counts are not a direct measurement of actual
@@ -499,8 +600,22 @@ problems, crime, or infrastructure failure.
 - **Public complaint data measures reporting as well as conditions.**
   Every count in this project is a joint signal of what's actually
   happening and who chose, or was able, to report it.
+- **Test your intuitions; some will be wrong.** The reporting-gap
+  analysis backed one of my expectations (Chinese-speaking
+  neighborhoods file fewer housing complaints than their housing
+  predicts) and contradicted two (older neighborhoods don't report
+  less, and language barriers didn't push people toward the phone).
 
 ## Future work
+
+**A stronger test of under-reporting.** The reporting-gap analysis
+compares complaints with what the Census says about housing, which
+can't see actual building conditions. Comparing complaints with
+conditions measured independently of 311 — for example, inspector-rated
+street cleanliness or proactive rodent inspections — would separate
+"fewer problems" from "fewer reports" far more directly.
+
+**Event-aware daily forecasting.**
 
 The current models forecast monthly totals from historical complaint
 patterns alone. They have no way to know in advance about one-off
