@@ -55,6 +55,11 @@ jobs:
             echo "Nothing changed."
           else
             month=$(python -c "import json; print(json.load(open('data/live/metadata.json'))['complete_through'])")
-            git commit -m "Monthly refresh: actuals through ${month}, new frozen forecasts"
+            frozen=$(git diff --cached --name-only --diff-filter=A -- 'data/forecasts/forecast_*.csv' | wc -l | tr -d ' ')
+            if [ "$frozen" -gt 0 ]; then
+              git commit -m "Monthly refresh: actuals through ${month}, ${frozen} new frozen forecasts"
+            else
+              git commit -m "Monthly refresh: actuals through ${month}"
+            fi
             git push
           fi
