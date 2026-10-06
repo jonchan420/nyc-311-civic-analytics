@@ -2,7 +2,7 @@
 
 > I turned a classroom visualization assignment into a reproducible
 > civic analytics and forecasting pipeline that processes more than
-> 21.9 million NYC 311 records and evaluates predictions honestly as
+> 22.6 million NYC 311 records and evaluates predictions honestly as
 > new city data arrives.
 
 End-to-end civic analytics project analyzing NYC 311 service requests
@@ -23,9 +23,10 @@ This project began as an EST 389 (Intro to Responsible AI and Data
 Science) class assignment: clean and visualize one year of NYC 311
 complaint data. I originally picked NYC 311 because the dataset was
 large and I wanted real experience working with public data at scale.
-I later expanded it into a full pipeline covering more than 21.9
-million records (21,890,525, per `data/raw/parquet_by_year/`) from
-2020 through 2026.
+I later expanded it into a full pipeline covering more than 22.6
+million records from January 2020 through September 2026 (22,659,637;
+`data/live/metadata.json` holds the current total, which grows each
+month).
 
 It's also personally motivated. I regularly notice sanitation issues
 in my own neighborhood — trash left on the street that doesn't get
@@ -58,7 +59,7 @@ millions of 311 complaints. Specifically, I wanted to understand:
   analysis and visualization, in `notebooks/` and `report/` (not yet
   restored to this repo — see Repository structure below).
 - **Portfolio expansion.** The same question asked at real scale:
-  2020–present, 21.9M+ records, a memory-safe DuckDB/Parquet
+  2020–present, 22.6M+ records, a memory-safe DuckDB/Parquet
   pipeline, population-adjusted comparisons, baseline-vs-ML
   forecasting, frozen predictions scored against real incoming data,
   and a Streamlit dashboard.
@@ -69,7 +70,7 @@ millions of 311 complaints. Specifically, I wanted to understand:
 
 ## Key design decisions
 
-- **DuckDB for the 14 GB raw CSV (21.9M+ rows).** The raw export is
+- **DuckDB for the 14 GB raw CSV (about 21.9M rows from 2020 on).** The raw export is
   converted once to yearly Parquet partitions in a single streaming
   pass. No pandas chunking, no memory pressure, and the raw CSV is
   never read again.
@@ -188,20 +189,22 @@ Borough populations from the 2020 US Census, in
 
 ## Population normalization: the equity flip
 
-Source: `data/processed/borough_per_capita.parquet`, built by
-`src/per_capita_analysis.py`.
+Source: `data/live/borough_per_capita.csv` (refreshed monthly by
+`src/refresh_live.py`; figures below are complete months, January
+2020–September 2026). `src/per_capita_analysis.py` builds the same
+table from the local raw snapshot.
 
 My original class analysis showed Brooklyn with the highest total
 complaint count — unsurprising, since Brooklyn is also the most
 populous borough:
 
-| Borough | Total complaints (2020–2026) | Population | Complaints per 100k |
+| Borough | Total complaints (Jan 2020–Sep 2026) | Population | Complaints per 100k |
 |---|---|---|---|
-| Brooklyn | 6,555,048 | 2,736,074 | 239,579 |
-| Queens | 5,256,588 | 2,405,464 | 218,527 |
-| Bronx | 4,669,395 | 1,472,654 | **317,073** |
-| Manhattan | 4,409,687 | 1,694,251 | 260,274 |
-| Staten Island | 921,370 | 495,747 | 185,855 |
+| Brooklyn | 6,800,549 | 2,736,074 | 248,551 |
+| Queens | 5,452,251 | 2,405,464 | 226,661 |
+| Bronx | 4,816,169 | 1,472,654 | **327,040** |
+| Manhattan | 4,559,278 | 1,694,251 | 269,103 |
+| Staten Island | 952,040 | 495,747 | 192,042 |
 
 Adjusted for population, the ranking flips: the **Bronx** has the
 highest complaint rate per 100,000 residents, despite having the
@@ -316,7 +319,7 @@ quietly patched:
   original file is kept, not deleted, but should not be used as the
   seasonal-naive baseline going forward.
 
-**Current, correctly-anchored forecasts for July 2026** (both
+**Correctly-anchored forecasts frozen July 22, 2026** (both
 `training_end_month = 2026-06`):
 
 | model | file | July 2026 prediction |
@@ -324,11 +327,58 @@ quietly patched:
 | gradient_boosting | `forecast_2026_gradient_boosting_20260722_2058.csv` | 321,586 |
 | seasonal_naive (lag-12) | `forecast_2026_seasonal_naive_20260722_2106.csv` | 315,877 |
 
-The gap is 5,709 (1.8%) — not the ~23,000 gap it would appear to be
-against the mislabeled lag-24 file. Given gradient boosting's test-set
-win during the current structural break, it should have an edge, but
-1.8% is a thin margin the first scoring checkpoint (roughly ten days
-after this forecast was frozen) will actually test.
+The gap was 5,709 (1.8%) — not the ~23,000 gap it would have appeared
+to be against the mislabeled lag-24 file. How that race actually
+turned out is below.
+
+## Live, automated forecasting
+
+`.github/workflows/monthly-refresh.yml` runs on the 5th of every month
+(and on demand). It pulls complete-month totals straight from the NYC
+Open Data API into `data/live/`, scores every frozen forecast into
+`data/live/forecast_scoreboard.csv`, freezes the next three months for
+both models, and commits the results. `src/refresh_live.py` refuses to
+write anything if the API hasn't finished publishing the previous month,
+if any month is missing, or if already-published history moves by more
+than 2%. Forecast scripts skip any month already frozen, so a re-run
+can't create duplicates.
+
+**Scoring rule.** For each month, each model is scored on the most
+recent forecast that existed before that month's data could be
+complete, excluding the superseded files in
+`data/forecasts/superseded.csv`. Actuals come from the API's full
+monthly totals. That matters: `update_from_api.py` only fetches
+records *created* after the local snapshot, so it misses records dated
+earlier but published late (July 2026: 343,123 via the API vs 342,791
+locally).
+
+**First checkpoint: July–September 2026** (source:
+`data/live/forecast_scoreboard.csv`; both forecasts frozen July 22):
+
+| month | actual | gradient boosting | seasonal naive (lag-12) |
+|---|---|---|---|
+| Jul 2026 | 343,123 | 321,586 (−6.3%) | 315,877 (−7.9%) |
+| Aug 2026 | 328,905 | 312,489 (−5.0%) | 304,038 (−7.6%) |
+| Sep 2026 | 323,614 | 312,489 (−3.4%) | 302,684 (−6.5%) |
+| **WAPE** | | **4.93%** | 7.34% |
+
+Gradient boosting was closer every month, so the July 22 race went to
+the trained model. Both forecasts were too low every month, because
+2026 stayed above 2025 (+8.6% in July, +8.2% in August, +6.9% in
+September, per `data/live/monthly_citywide_counts.csv`). Three months
+is a small sample; the scoreboard keeps growing each month.
+
+**A limit the live run exposed.** The gradient boosting forecast frozen
+on October 5 (`forecast_gradient_boosting_20261005_2259.csv`) predicts
+310,599 / 310,599 / 319,696 for October–December — exactly what the
+July 22 forecast predicted for those months, despite three more months
+of higher actual volume. Tree models can only output values in the
+range they were trained on, and this one trains on 2021–2025. Once
+recent volume rises past the levels its splits cover, more volume no
+longer moves the prediction, which is part of why it ran low all
+through 2026. Fixing that (training on 2026 too, or a model that can
+extrapolate) is a deliberate model change and will be frozen as a new,
+separately named model rather than silently replacing this one.
 
 ## The 2026 structural break
 
@@ -437,6 +487,10 @@ problems, crime, or infrastructure failure.
 - **Predictions have to be preserved before the actuals arrive**, or
   "the model predicted this" becomes unverifiable after the fact —
   which is the entire reason frozen forecasts exist here.
+- **Tree models can't extrapolate.** Gradient boosting beat the baseline
+  on the first live checkpoint, but it can't predict above the range it
+  trained on — so in a year running higher than any before it, it
+  stays systematically low.
 - **Public complaint data measures reporting as well as conditions.**
   Every count in this project is a joint signal of what's actually
   happening and who chose, or was able, to report it.

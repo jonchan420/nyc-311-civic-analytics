@@ -16,12 +16,14 @@ concurrency:
 
 jobs:
   refresh:
-    runs-on: ubuntu-latest
+    # pinned rather than ubuntu-latest so an image migration can't change
+    # the Python build or system libraries between monthly runs
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
