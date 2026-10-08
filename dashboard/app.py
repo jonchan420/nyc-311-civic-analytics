@@ -244,6 +244,8 @@ with tab_equity:
             "Housing complaints (heat, plumbing, mold, leaks) per 1,000 renter households, "
             "2022–2024, compared with what each neighborhood's housing conditions predict "
             "(building age, poverty, crowding, building size, borough; Census ACS 2020–2024). "
+            "Households in NYCHA public housing aren't counted: NYCHA tenants report repairs "
+            "to NYCHA, not through 311. "
             "**Red = fewer complaints than expected.** This shows *association*, not proof "
             "of under-reporting: a neighborhood can also file less because its housing is "
             "better than the Census can measure."
@@ -258,7 +260,7 @@ with tab_equity:
         )
         suffix = "_income_adjusted" if adjust.endswith("income") else ""
         analyzed["gap"] = analyzed[f"gap_pct{suffix}"]
-        analyzed["expected"] = analyzed[f"expected_per_1000_renters{suffix}"]
+        analyzed["expected"] = analyzed[f"expected_per_1000_non_nycha_renters{suffix}"]
 
         fig_map = px.choropleth_map(
             analyzed, geojson=boundaries, locations="modzcta", featureidkey="properties.modzcta",
@@ -266,19 +268,20 @@ with tab_equity:
             range_color=(-100, 100), map_style="carto-positron",
             center={"lat": 40.705, "lon": -73.94}, zoom=9.2, opacity=0.75,
             hover_name="label",
-            hover_data={"modzcta": False, "gap": ":+.0f", "complaints_per_1000_renters": ":.0f",
+            hover_data={"modzcta": False, "gap": ":+.0f", "complaints_per_1000_non_nycha_renters": ":.0f",
                         "expected": ":.0f", "pct_lep_chinese": ":.1f", "pct_lep_spanish": ":.1f",
-                        "pct_income_150k": ":.1f"},
+                        "pct_income_150k": ":.1f", "pct_nycha": ":.0f"},
             labels={"color": "vs. expected (%)", "gap": "vs. expected (%)",
-                    "complaints_per_1000_renters": "Complaints / 1,000 renters / yr",
+                    "complaints_per_1000_non_nycha_renters": "Complaints / 1,000 renters / yr",
                     "expected": "Expected", "pct_lep_chinese": "Chinese limited-English (%)",
                     "pct_lep_spanish": "Spanish limited-English (%)",
-                    "pct_income_150k": "Households $150k+ (%)"},
+                    "pct_income_150k": "Households $150k+ (%)",
+                    "pct_nycha": "Renters in NYCHA, not counted (%)"},
         )
         fig_map.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0}, height=560)
         st.plotly_chart(fig_map, use_container_width=True)
         st.caption(f"{len(analyzed)} of {len(gap)} neighborhoods shown; the rest have fewer than "
-                   "1,000 renter households. Color is capped at ±100%.")
+                   "1,000 renter households outside public housing. Color is capped at ±100%.")
 
         st.markdown("#### Look up a neighborhood")
         options = analyzed.sort_values("label")["label"].tolist()
@@ -286,7 +289,9 @@ with tab_equity:
         chosen = analyzed[analyzed["label"] == st.selectbox("Neighborhood", options, index=default)].iloc[0]
         rank = int((analyzed["gap"] < chosen["gap"]).sum()) + 1
         c1, c2, c3 = st.columns(3)
-        c1.metric("Complaints per 1,000 renter households / yr", f"{chosen['complaints_per_1000_renters']:,.0f}")
+        c1.metric("Complaints per 1,000 renter households / yr",
+                  f"{chosen['complaints_per_1000_non_nycha_renters']:,.0f}",
+                  help="Not counting households in NYCHA public housing.")
         c2.metric("Expected from its housing", f"{chosen['expected']:,.0f}")
         c3.metric("Difference", f"{chosen['gap']:+.0f}%", help=f"Rank {rank} of {len(analyzed)} "
                   "(1 = largest shortfall).")
@@ -295,7 +300,8 @@ with tab_equity:
             f"Spanish {chosen['pct_lep_spanish']:.1f}%, other Asian {chosen['pct_lep_other_asian']:.1f}%, "
             f"other {chosen['pct_lep_other']:.1f}% · residents 65+ {chosen['pct_age_65_plus']:.1f}% · "
             f"no internet {chosen['pct_no_internet']:.1f}% · households $150k+ "
-            f"{chosen['pct_income_150k']:.1f}% · complaints by phone {chosen['pct_phone']:.0f}%"
+            f"{chosen['pct_income_150k']:.1f}% · complaints by phone {chosen['pct_phone']:.0f}% · "
+            f"renters in NYCHA public housing (not counted) {chosen['pct_nycha']:.0f}%"
         )
 
         st.markdown("#### Which barriers go with fewer complaints?")
@@ -330,10 +336,10 @@ with tab_equity:
 
         st.markdown("#### Largest shortfalls")
         shortfalls = analyzed.sort_values("gap").head(15)[
-            ["label", "complaints_per_1000_renters", "expected", "gap", "pct_lep_chinese",
+            ["label", "complaints_per_1000_non_nycha_renters", "expected", "gap", "pct_lep_chinese",
              "pct_lep_spanish", "pct_lep_other", "pct_income_150k"]]
         st.dataframe(
-            shortfalls.style.format({"complaints_per_1000_renters": "{:,.0f}", "expected": "{:,.0f}",
+            shortfalls.style.format({"complaints_per_1000_non_nycha_renters": "{:,.0f}", "expected": "{:,.0f}",
                                      "gap": "{:+.0f}%", "pct_lep_chinese": "{:.1f}%",
                                      "pct_lep_spanish": "{:.1f}%", "pct_lep_other": "{:.1f}%",
                                      "pct_income_150k": "{:.1f}%"}),

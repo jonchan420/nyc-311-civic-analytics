@@ -7,6 +7,12 @@ because tenants file them about their own building, so the complaint
 lands in the ZIP where the reporter lives — unlike street or noise
 complaints, which commuters file wherever they happen to be.
 
+Renter households in NYCHA public housing are left out of the rate
+(added after the first results). NYCHA tenants report repairs to NYCHA,
+not HPD (the HPD complaints filed at NYCHA's own lots are printed as a
+check), so counting them made public-housing neighborhoods look like
+they under-report.
+
 Two models, both OLS on log(rate) with HC3 robust standard errors:
   1. Need model: housing risk only — share of renter units built before
      1950, poverty rate, overcrowding, share of renters in 1-4 unit
@@ -71,6 +77,7 @@ def build_neighborhoods() -> pd.DataFrame:
     acs = pd.read_csv(EQUITY_DIR / "acs_2024_nyc_zcta.csv", dtype={"zcta": str})
     complaints = pd.read_csv(EQUITY_DIR / "hpd_complaints_2022_2024_by_zip.csv",
                              dtype={"incident_zip": str})
+    nycha = pd.read_csv(EQUITY_DIR / "nycha_apartments.csv", dtype={"zip_code": str})
 
     names = crosswalk.drop_duplicates("modzcta").set_index("modzcta")["neighborhood"]
     census = acs.merge(crosswalk[["zcta", "modzcta"]], on="zcta").groupby("modzcta").sum(numeric_only=True)
@@ -83,10 +90,16 @@ def build_neighborhoods() -> pd.DataFrame:
         .groupby(["modzcta", "borough"])["complaints"].sum()
         .reset_index().sort_values("complaints").drop_duplicates("modzcta", keep="last")
         .set_index("modzcta")["borough"])
+    # apartments NYCHA managed, averaged over the window; developments no longer
+    # in NYCHA's address file have no ZIP and stay in the denominator
+    nycha = nycha.merge(crosswalk[["zcta", "modzcta"]], left_on="zip_code", right_on="zcta")
+    nycha_apartments = (nycha["apartments"] * nycha["managed_share"]).groupby(nycha["modzcta"]).sum()
 
     df = census.copy()
     df["neighborhood"] = names
     df["borough"] = borough
+    df["nycha_apartments"] = nycha_apartments.reindex(df.index).fillna(0)
+    df["non_nycha_renter_households"] = df["renter_households"] - df["nycha_apartments"]
     df["complaints_2022_2024"] = totals.reindex(df.index).fillna(0).astype(int)
     df["pct_phone"] = 100 * phone.reindex(df.index).fillna(0) / df["complaints_2022_2024"].where(
         df["complaints_2022_2024"] > 0)
@@ -105,10 +118,12 @@ def build_neighborhoods() -> pd.DataFrame:
     df["pct_age_65_plus"] = pct("age_65_plus", "age_universe")
     df["pct_no_internet"] = pct("no_internet", "internet_universe")
     df["pct_income_150k"] = pct("income_150k_plus", "income_universe")
+    df["pct_nycha"] = pct("nycha_apartments", "renter_households")
     # several MODZCTAs share a neighborhood name (three "Financial District"s)
     df["label"] = df["neighborhood"] + " (" + df.index + ")"
-    df["complaints_per_1000_renters"] = (
-        1000 * df["complaints_2022_2024"] / YEARS / df["renter_households"].where(df["renter_households"] > 0))
+    df["complaints_per_1000_non_nycha_renters"] = (
+        1000 * df["complaints_2022_2024"] / YEARS
+        / df["non_nycha_renter_households"].where(df["non_nycha_renter_households"] > 0))
     return df.reset_index()
 
 
@@ -176,15 +191,24 @@ def fit(df: pd.DataFrame, name: str, terms: list[str], outcome: str = "log_rate"
 def main() -> None:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     neighborhoods = build_neighborhoods()
-    complete = neighborhoods.dropna(subset=NEED + BARRIERS + ["complaints_per_1000_renters", "borough"])
-    included = complete[(complete["renter_households"] >= MIN_RENTER_HOUSEHOLDS)
+    complete = neighborhoods.dropna(subset=NEED + BARRIERS + ["complaints_per_1000_non_nycha_renters",
+                                                              "borough"])
+    included = complete[(complete["non_nycha_renter_households"] >= MIN_RENTER_HOUSEHOLDS)
                         & (complete["complaints_2022_2024"] > 0)].copy()
     excluded = neighborhoods[~neighborhoods["modzcta"].isin(included["modzcta"])]
     print(f"{len(included)} of {len(neighborhoods)} neighborhoods analyzed; excluded "
-          f"{len(excluded)} with < {MIN_RENTER_HOUSEHOLDS:,} renter households or missing data: "
+          f"{len(excluded)} with < {MIN_RENTER_HOUSEHOLDS:,} renter households outside NYCHA or missing data: "
           f"{', '.join(excluded['neighborhood'].fillna(excluded['modzcta']).head(12))}"
           f"{' ...' if len(excluded) > 12 else ''}")
-    included["log_rate"] = np.log(included["complaints_per_1000_renters"])
+    included["log_rate"] = np.log(included["complaints_per_1000_non_nycha_renters"])
+
+    lots = pd.read_csv(EQUITY_DIR / "nycha_lots_hpd_complaints.csv")
+    print(f"NYCHA check: {lots['hpd_complaints'].sum():,} HPD complaints in 2022-2024 at the {len(lots)} "
+          f"lots NYCHA managed throughout, {1000 * lots['hpd_complaints'].sum() / YEARS / lots['apartments'].sum():.1f} "
+          "per 1,000 apartments a year, vs. "
+          f"{1000 * included['complaints_2022_2024'].sum() / YEARS / included['non_nycha_renter_households'].sum():.0f} "
+          f"per 1,000 other renter households; {included['nycha_apartments'].sum():,.0f} NYCHA apartments "
+          "left out of the analyzed neighborhoods' rates")
 
     need_table, need_fit = fit(included, "need_only", NEED)
     income_need_table, income_need_fit = fit(included, "need_plus_income", NEED + INCOME_CHECK)
@@ -195,7 +219,7 @@ def main() -> None:
 
     # robustness: re-fit the full model under alternative samples/specifications
     checks = [full_table.assign(check="main", dropped="")]
-    robust = included[included["renter_households"] >= ROBUSTNESS_MIN_RENTER_HOUSEHOLDS]
+    robust = included[included["non_nycha_renter_households"] >= ROBUSTNESS_MIN_RENTER_HOUSEHOLDS]
     checks.append(fit(robust, f"min_{ROBUSTNESS_MIN_RENTER_HOUSEHOLDS}_renters", NEED + BARRIERS)[0]
                   .assign(dropped=""))
     checks.append(fit(included, "no_borough_effects", NEED + BARRIERS, borough_effects=False)[0]
@@ -217,16 +241,17 @@ def main() -> None:
        "p_value", "n"]]
 
     for name, fitted in [("", need_fit), ("_income_adjusted", income_need_fit)]:
-        included[f"expected_per_1000_renters{name}"] = np.exp(fitted["fitted"])
-        included[f"gap_pct{name}"] = 100 * (included["complaints_per_1000_renters"]
-                                            / included[f"expected_per_1000_renters{name}"] - 1)
-    gap_cols = ["expected_per_1000_renters", "gap_pct",
-                "expected_per_1000_renters_income_adjusted", "gap_pct_income_adjusted"]
+        included[f"expected_per_1000_non_nycha_renters{name}"] = np.exp(fitted["fitted"])
+        included[f"gap_pct{name}"] = 100 * (included["complaints_per_1000_non_nycha_renters"]
+                                            / included[f"expected_per_1000_non_nycha_renters{name}"] - 1)
+    gap_cols = ["expected_per_1000_non_nycha_renters", "gap_pct",
+                "expected_per_1000_non_nycha_renters_income_adjusted", "gap_pct_income_adjusted"]
     out = neighborhoods.merge(included[["modzcta"] + gap_cols], on="modzcta", how="left")
     out["analyzed"] = out["modzcta"].isin(included["modzcta"])
     keep = (["modzcta", "neighborhood", "label", "borough", "analyzed", "renter_households",
-             "complaints_2022_2024", "complaints_per_1000_renters"] + gap_cols
-            + ["pct_phone", "pct_lep_any"] + NEED + BARRIERS + INCOME_CHECK)
+             "nycha_apartments", "non_nycha_renter_households", "complaints_2022_2024",
+             "complaints_per_1000_non_nycha_renters"] + gap_cols
+            + ["pct_phone", "pct_nycha", "pct_lep_any"] + NEED + BARRIERS + INCOME_CHECK)
     out = out[keep].sort_values("gap_pct")
     out.round(2).to_csv(RESULTS_DIR / "neighborhood_reporting_gap.csv", index=False)
     coefficients.round(6).to_csv(RESULTS_DIR / "model_coefficients.csv", index=False)
@@ -260,9 +285,9 @@ def main() -> None:
     print(phone.assign(change_per_10=10 * phone["coef"])[["label", "change_per_10", "p_value"]]
           .round(3).to_string(index=False))
 
-    cols = ["label", "complaints_per_1000_renters", "expected_per_1000_renters", "gap_pct",
-            "gap_pct_income_adjusted", "pct_lep_spanish", "pct_lep_chinese", "pct_lep_other",
-            "pct_income_150k"]
+    cols = ["label", "complaints_per_1000_non_nycha_renters", "expected_per_1000_non_nycha_renters",
+            "gap_pct", "gap_pct_income_adjusted", "pct_nycha", "pct_lep_spanish", "pct_lep_chinese",
+            "pct_lep_other", "pct_income_150k"]
     shown = out[out["analyzed"]]
     print("\n=== largest shortfalls vs. housing-risk expectation")
     print(shown[cols].head(12).round(1).to_string(index=False))
@@ -310,8 +335,8 @@ def save_map(out: pd.DataFrame) -> None:
     bar = fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, shrink=0.6, pad=0.01)
     bar.set_label("Housing complaints vs. what housing conditions predict (%)")
     ax.set_title("Who files fewer housing complaints than expected?\n"
-                 "HPD complaints per renter household, 2022–2024 (red = fewer than expected)",
-                 fontsize=11)
+                 "HPD complaints per renter household outside public housing, 2022–2024\n"
+                 "(red = fewer than expected)", fontsize=11)
     fig.savefig(MAP_PATH, dpi=150, bbox_inches="tight")
     plt.close(fig)
 

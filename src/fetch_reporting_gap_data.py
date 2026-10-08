@@ -1,6 +1,6 @@
 """Fetch the inputs for the reporting-gap analysis into data/equity/.
 
-Three public sources, no API keys needed:
+Four public sources, no API keys needed:
   - NYC 311 (Socrata API): HPD housing-maintenance complaints filed
     2022-2024, counted by incident ZIP, borough, and reporting channel.
   - Census ACS 2020-2024 5-year estimates, streamed from the Census
@@ -8,6 +8,11 @@ Three public sources, no API keys needed:
     files don't) and filtered to NYC ZIP Code Tabulation Areas (ZCTAs).
   - NYC Health's Modified ZCTAs (MODZCTA): the ZIP-to-neighborhood
     crosswalk, neighborhood names, and boundaries for the map.
+  - NYCHA (Socrata API): apartments per public-housing development and
+    each building's ZIP and tax lot. NYCHA tenants report repairs to
+    NYCHA, not HPD, so the analysis leaves them out of the complaint
+    rate; HPD complaints filed at NYCHA's own lots are fetched to check
+    that.
 
 The 2022-2024 complaint window sits inside the ACS 2020-2024 window and
 skips the worst COVID distortion of 2020-2021. Outputs are small and
@@ -33,6 +38,8 @@ EQUITY_DIR = DATA_DIR / "equity"
 SOCRATA = "https://data.cityofnewyork.us/resource"
 MODZCTA_ID = "pri4-ifjk"
 NEIGHBORHOOD_NAMES_ID = "6qs8-44ki"
+NYCHA_DATA_BOOK_ID = "evjd-dqpz"
+NYCHA_ADDRESSES_ID = "3ub5-4ph8"
 ACS_BULK = ("https://www2.census.gov/programs-surveys/acs/summary_file/2024/"
             "table-based-SF/data/5YRData/acsdt5y2024-{table}.dat")
 ZCTA_PREFIX = "860Z200US"
@@ -160,6 +167,79 @@ def fetch_hpd_complaints() -> pd.DataFrame:
     return complaints
 
 
+def fetch_nycha() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """NYCHA apartments by development and tax lot, and HPD complaints at those lots.
+
+    A development converted to private management (RAD/PACT) counts as
+    NYCHA only for the share of the complaint window before its transfer;
+    after that its tenants can file with HPD. Each development's apartments
+    are split across its tax lots by number of building addresses.
+    Developments converted since and dropped from NYCHA's current address
+    file can't be placed and keep a blank ZIP.
+    """
+    book = requests.get(f"{SOCRATA}/{NYCHA_DATA_BOOK_ID}.json", params={
+        "$select": "development, tds_, program, number_of_current_apartments, rad_transferred_date",
+        "$limit": 5000}, timeout=300)
+    book.raise_for_status()
+    book = pd.DataFrame(book.json())
+    # a few rows add up others ("DOUGLASS" = "DOUGLASS I" + "II", development
+    # numbers "082, 582"; "RED HOOK I" and "II" overlap "RED HOOK EAST" and
+    # "WEST") and would double count; every operating row has one plain number
+    book = book[book["tds_"].str.fullmatch(r"\d+", na=False)
+                & ~book["program"].str.contains("NON-NYCHA", na=False)].copy()
+    book["tds"] = book["tds_"].str.lstrip("0")  # zero-padded here, not in the address file
+    if book["tds"].duplicated().any():
+        raise RuntimeError("A NYCHA development number appears in more than one data book row.")
+
+    addresses = requests.get(f"{SOCRATA}/{NYCHA_ADDRESSES_ID}.json", params={
+        "$select": "tds, borough_block_lot, zip_code", "$limit": 50000}, timeout=300)
+    addresses.raise_for_status()
+    addresses = pd.DataFrame(addresses.json())
+    addresses["tds"] = addresses["tds"].str.lstrip("0")
+    unknown = set(addresses["tds"]) - set(book["tds"])
+    if unknown:
+        raise RuntimeError(f"NYCHA addresses with no development in the data book: {sorted(unknown)}")
+    lot_share = (addresses.groupby(["tds", "borough_block_lot", "zip_code"]).size()
+                 / addresses.groupby("tds").size()).rename("share").reset_index()
+
+    start, end = pd.Timestamp(COMPLAINT_START), pd.Timestamp(COMPLAINT_END)
+    transferred = pd.to_datetime(book["rad_transferred_date"])
+    book["managed_share"] = ((transferred.clip(start, end).fillna(end) - start) / (end - start)).round(4)
+    book["rad_transferred_date"] = transferred.dt.strftime("%Y-%m-%d")
+    nycha = book.merge(lot_share, on="tds", how="left").rename(columns={"borough_block_lot": "bbl"})
+    nycha["apartments"] = (pd.to_numeric(nycha["number_of_current_apartments"].str.replace(",", ""))
+                           * nycha["share"].fillna(1)).round(2)
+    nycha = (nycha[["development", "bbl", "zip_code", "apartments", "rad_transferred_date", "managed_share"]]
+             .sort_values(["development", "bbl", "zip_code"]).reset_index(drop=True))
+
+    # lots NYCHA managed for the whole window, to check its tenants don't file with HPD
+    throughout = nycha.groupby("bbl")["managed_share"].min() == 1
+    lots = nycha[nycha["bbl"].isin(throughout[throughout].index)].groupby("bbl")["apartments"].sum()
+    counts = []
+    for i in range(0, len(lots), 100):
+        listed = ", ".join(f"'{bbl}'" for bbl in lots.index[i:i + 100])
+        response = requests.get(API_BASE, params={
+            "$select": "bbl, count(*) AS complaints",
+            "$where": (f"agency = 'HPD' AND created_date >= '{COMPLAINT_START}T00:00:00' "
+                       f"AND created_date < '{COMPLAINT_END}T00:00:00' AND bbl IN ({listed})"),
+            "$group": "bbl",
+            "$limit": 5000,
+        }, timeout=900)
+        response.raise_for_status()
+        counts.extend(response.json())
+    counts = pd.DataFrame(counts, columns=["bbl", "complaints"]).astype({"complaints": int})
+    nycha_lots = lots.round(2).reset_index().merge(counts, on="bbl", how="left")
+    nycha_lots["hpd_complaints"] = nycha_lots.pop("complaints").fillna(0).astype(int)
+
+    managed = nycha["apartments"] * nycha["managed_share"]
+    print(f"  {book['development'].nunique()} developments; {managed.sum():,.0f} apartments NYCHA-managed "
+          f"on average over the window, {managed[nycha['zip_code'].notna()].sum() / managed.sum():.1%} "
+          "placed by ZIP")
+    print(f"  {nycha_lots['hpd_complaints'].sum():,} HPD complaints at the {len(nycha_lots)} lots NYCHA "
+          f"managed throughout ({nycha_lots['apartments'].sum():,.0f} apartments)")
+    return nycha, nycha_lots
+
+
 def main() -> None:
     EQUITY_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -177,10 +257,15 @@ def main() -> None:
           f"{complaints.loc[mapped, 'complaints'].sum() / complaints['complaints'].sum():.2%} "
           "have a ZIP inside a NYC neighborhood")
 
+    print("Fetching NYCHA apartments and HPD complaints at NYCHA lots...")
+    nycha, nycha_lots = fetch_nycha()
+
     crosswalk.to_csv(EQUITY_DIR / "modzcta_crosswalk.csv", index=False)
     (EQUITY_DIR / "modzcta_boundaries.geojson").write_text(json.dumps(boundaries))
     acs.to_csv(EQUITY_DIR / "acs_2024_nyc_zcta.csv", index=False)
     complaints.to_csv(EQUITY_DIR / "hpd_complaints_2022_2024_by_zip.csv", index=False)
+    nycha.to_csv(EQUITY_DIR / "nycha_apartments.csv", index=False)
+    nycha_lots.to_csv(EQUITY_DIR / "nycha_lots_hpd_complaints.csv", index=False)
     print(f"Saved to {EQUITY_DIR}")
 
 
