@@ -155,6 +155,7 @@ class Answer:
     grounding: GroundingReport | None = None
     model_calls: int = 0
     cost_usd: float = 0.0
+    usage: dict[str, int] = field(default_factory=dict)     # tokens summed over the model calls
 
 
 class Analyst:
@@ -172,10 +173,7 @@ class Analyst:
 
     def ask(self, question: str) -> Answer:
         self._calls = []
-        answer = self._answer(question)
-        answer.model_calls = len(self._calls)
-        answer.cost_usd = round(sum(call.cost_usd for call in self._calls), 6)
-        return answer
+        return self._with_usage(self._answer(question))
 
     def _answer(self, question: str) -> Answer:
         plan = route(question, self.context)
@@ -200,9 +198,14 @@ class Analyst:
         self._calls = []
         if tool not in TOOLS:
             return Answer("decline", f'"{tool}" isn\'t one of the available tools.')
-        answer = self._run(question, Route("tool", tool, params), "form")
+        return self._with_usage(self._run(question, Route("tool", tool, params), "form"))
+
+    def _with_usage(self, answer: Answer) -> Answer:
         answer.model_calls = len(self._calls)
         answer.cost_usd = round(sum(call.cost_usd for call in self._calls), 6)
+        for call in self._calls:
+            for name, tokens in call.usage.items():
+                answer.usage[name] = answer.usage.get(name, 0) + tokens
         return answer
 
     def _run(self, question: str, plan: Route, routed_by: str) -> Answer:
