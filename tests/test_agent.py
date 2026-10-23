@@ -160,7 +160,8 @@ def test_unsupported_numbers_fall_back_to_the_template(fixture_dir):
     assert answer.written_by == "template (the model's answer used numbers not in the result: 900%)"
     assert answer.text.startswith("The five boroughs recorded 3,350 complaints in Jan–Feb 2026, up 60 (+1.8%) "
                                   "from 3,290 in Jan–Feb 2025.")
-    assert "900" not in answer.text and not answer.grounding.grounded
+    assert "900" not in answer.text and answer.grounding.grounded             # what's shown checks out
+    assert answer.draft_grounding.unsupported == ["900%"]                         # and the draft is on record
 
 
 def test_invalid_parameters_get_one_retry(fixture_dir):

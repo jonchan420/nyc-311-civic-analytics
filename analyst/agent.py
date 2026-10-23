@@ -185,7 +185,8 @@ class Answer:
     notes: list[tuple[Chunk, float]] = field(default_factory=list)
     routed_by: str = "rules"                    # rules | model
     written_by: str = "template"                # template | model | template (reason)
-    grounding: GroundingReport | None = None
+    grounding: GroundingReport | None = None         # the text shown: every number checked
+    draft_grounding: GroundingReport | None = None   # a model's draft, kept even when it was replaced
     model_calls: int = 0
     cost_usd: float = 0.0
     usage: dict[str, int] = field(default_factory=dict)     # tokens summed over the model calls
@@ -265,10 +266,10 @@ class Analyst:
             return Answer("clarify", f"I couldn't run that as asked: {problems}.", tool=plan.tool,
                           params=plan.params, routed_by=routed_by)
         notes = self.knowledge.search(self._note_query(question, plan.tool, result), k=3)
-        text, written_by, grounding = self._write(question, plan.tool, result, plan.assumptions, notes)
+        text, written_by, grounding, draft = self._write(question, plan.tool, result, plan.assumptions, notes)
         return Answer("answer", text, plan.tool, params.model_dump(mode="json", exclude_none=True), result,
                       plan.assumptions, notes=notes, routed_by=routed_by, written_by=written_by,
-                      grounding=grounding)
+                      grounding=grounding, draft_grounding=draft)
 
     # ---------------------------------------------------------------- model steps
 
@@ -318,22 +319,23 @@ class Analyst:
                       routed_by="model")
 
     def _write(self, question: str, tool: str, result: ToolResult, assumptions: list[str],
-               notes: list[tuple[Chunk, float]]) -> tuple[str, str, GroundingReport]:
+               notes: list[tuple[Chunk, float]]) -> tuple[str, str, GroundingReport, GroundingReport | None]:
+        """(text shown, who wrote it, its grounding report, the model draft's report if there was one)."""
         template = template_answer(tool, result, assumptions)
         evidence = (result.model_dump(mode="json", include={"summary", "rows", "warnings"}),
                     result.provenance.params, result.provenance.filters, assumptions, question)
         if self.llm is None:
-            return template, "template", check(template, *evidence)
+            return template, "template", check(template, *evidence), None
         response = self._call(system=WRITER_SYSTEM,
                               messages=[{"role": "user", "content": writer_prompt(question, result, assumptions, notes)}],
                               max_tokens=900)
         if response is None or response.stop_reason == "refusal" or not response.text.strip():
-            return template, "template (the model gave no answer)", check(template, *evidence)
-        report = check(response.text, *evidence)
-        if report.grounded:
-            return response.text.strip(), "model", report
+            return template, "template (the model gave no answer)", check(template, *evidence), None
+        draft = check(response.text, *evidence)
+        if draft.grounded:
+            return response.text.strip(), "model", draft, draft
         return (template, f"template (the model's answer used numbers not in the result: "
-                          f"{', '.join(report.unsupported[:5])})", report)
+                          f"{', '.join(draft.unsupported[:5])})", check(template, *evidence), draft)
 
     def _explain(self, question: str) -> Answer:
         notes = self.knowledge.search(question, k=3)
@@ -347,10 +349,12 @@ class Analyst:
             max_tokens=700)
         if response is None or not response.text.strip():
             return Answer("explain", text, notes=notes)
-        report = check(response.text, note_text, question)
-        if not report.grounded:
-            return Answer("explain", text, notes=notes, written_by="template (unsupported numbers)", grounding=report)
-        return Answer("explain", response.text.strip(), notes=notes, written_by="model", grounding=report)
+        draft = check(response.text, note_text, question)
+        if not draft.grounded:
+            return Answer("explain", text, notes=notes, written_by="template (unsupported numbers)",
+                          grounding=check(text, note_text, question), draft_grounding=draft)
+        return Answer("explain", response.text.strip(), notes=notes, written_by="model", grounding=draft,
+                      draft_grounding=draft)
 
     def _call(self, **request: Any) -> LLMResponse | None:
         """One model call, or None when the budget is used up or the provider fails;

@@ -194,9 +194,10 @@ def run_once(case: dict[str, Any], analyst: Analyst, recorder: Recorder | None, 
     seconds = round(time.perf_counter() - started, 3)
 
     docs = [chunk.doc for chunk, _ in answer.notes[:3]]
-    grounding = answer.grounding
+    grounding = answer.grounding  # of the text shown, after any fallback to the template
     if answer.kind == "explain":
         grounding = check(answer.text, [chunk.text for chunk, _ in answer.notes], case["question"])
+    draft = answer.draft_grounding
     checks: dict[str, bool | None] = dict.fromkeys(METRICS[1:-1])
     if expect["kind"] == "answer":
         checks["tool_selection"] = answer.kind == "answer" and answer.tool == expect["tool"]
@@ -231,6 +232,8 @@ def run_once(case: dict[str, Any], analyst: Analyst, recorder: Recorder | None, 
         "kind": answer.kind, "tool": answer.tool, "params": answer.params, "text": answer.text,
         "options": answer.options, "routed_by": answer.routed_by, "written_by": answer.written_by,
         "unsupported_numbers": grounding.unsupported if grounding else [],
+        "model_draft_rejected": None if draft is None else not draft.grounded,
+        "draft_unsupported_numbers": draft.unsupported if draft else [],
         "docs": docs, "planted_note_would_rank": viable, "planted_note_retrieved": planted,
         "model_calls": answer.model_calls, "cost_usd": answer.cost_usd, "usage": answer.usage,
         "seconds": seconds, "checks": checks,
@@ -351,8 +354,11 @@ def summarize_run(outcomes: list[dict[str, Any]], thresholds: dict[str, Any], ru
     usage: Counter = Counter()
     for one in every_run:
         usage.update(one["usage"])
+    drafts = [one["model_draft_rejected"] for one in every_run if one.get("model_draft_rejected") is not None]
     report_only = {
         "questions_run": len(every_run),
+        "model_drafts": len(drafts),
+        "model_drafts_rejected": sum(drafts),
         "placed_by_rules": sum(o["rules_route"] != "model" for o in outcomes) / len(outcomes),
         "model_calls_per_question": statistics.mean(r["model_calls"] for r in every_run),
         "mean_usd_per_question": statistics.mean(r["cost_usd"] for r in every_run),
@@ -408,6 +414,10 @@ def write_report() -> Path:
         wrong = sorted({f"{case_id} ({expected} -> {kind})" for case_id, kind, expected in runs if kind != expected})
         lines += ["", f"Route accuracy (report only): {percent(sum(k == e for _, k, e in runs) / len(runs))}"
                       + (f"; off route: {', '.join(wrong)}." if wrong else ".")]
+        if extra.get("model_drafts"):
+            lines += ["", f"Model-written answers replaced by the template because they used a number that "
+                          f"wasn't in the result (report only): {extra['model_drafts_rejected']} of "
+                          f"{extra['model_drafts']}."]
         lines += ["", f"Questions placed by the rules without a model: {percent(extra['placed_by_rules'])}. "
                       f"Model calls per question: {extra['model_calls_per_question']:.2f}. "
                       f"Mean cost per question: ${extra['mean_usd_per_question']:.4f}. "
