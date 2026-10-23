@@ -1,15 +1,17 @@
-"""The model layer: one small interface, two implementations, and a spending guard.
+"""The model layer: one small interface, three implementations, and a spending guard.
 
 LLMClient is all agent.py depends on, so the provider can change without
 touching the rest. FakeLLM returns scripted responses for tests and the
-offline demo; ClaudeClient calls the Anthropic API. BudgetGuard refuses a
-call before it would pass the request or dollar limit.
+offline demo; ClaudeClient calls the Anthropic API; OllamaClient calls a
+model running locally with Ollama, for free. BudgetGuard refuses a call
+before it would pass the request or dollar limit.
 """
 
 from __future__ import annotations
 
 import copy
 import datetime as dt
+import json
 import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
@@ -191,3 +193,88 @@ class ClaudeClient:
             cost_usd=cost,
             raw_content=list(response.content),
         )
+
+
+class OllamaClient:
+    """A model running locally with Ollama (https://ollama.com): free, and nothing leaves the machine.
+
+    Requests arrive in the shape agent.py builds for Claude (content blocks,
+    tool_use and tool_result) and are translated to Ollama's /api/chat here, so
+    the agent doesn't change with the provider. Ollama doesn't enforce strict tool
+    schemas; the Pydantic validation in agent.py catches what the model gets wrong.
+    """
+
+    name = "ollama"
+
+    def __init__(self, model: str = "qwen3:8b", host: str = "http://127.0.0.1:11434", think: bool = False,
+                 budget: BudgetGuard | None = None, timeout: float = 300.0, session: Any = None):
+        if session is None:
+            import requests
+            session = requests.Session()
+        self._session = session
+        self.model, self.host, self.think, self.timeout = model, host.rstrip("/"), think, timeout
+        self.budget = budget or BudgetGuard(max_requests=100_000, max_usd=float("inf"), max_tokens_per_call=4000)
+
+    def complete(self, *, system: str, messages: list[dict[str, Any]],
+                 tools: list[dict[str, Any]] | None = None, max_tokens: int = 2000) -> LLMResponse:
+        self.budget.reserve(max_tokens)
+        body: dict[str, Any] = {
+            "model": self.model,
+            "stream": False,
+            "think": self.think,  # off by default: much faster, and the tools don't need it
+            "messages": [{"role": "system", "content": system}, *ollama_messages(messages)],
+            "options": {"temperature": 0, "num_predict": max_tokens, "num_ctx": 8192},
+        }
+        if tools:
+            body["tools"] = [{"type": "function", "function": {"name": t["name"], "description": t["description"],
+                                                               "parameters": t["input_schema"]}} for t in tools]
+        try:
+            response = self._session.post(f"{self.host}/api/chat", json=body, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
+        except Exception as error:  # connection refused, timeout, HTTP error, or a reply that isn't JSON
+            raise ProviderError(f"{type(error).__name__}: {error}") from error
+        self.budget.record(0.0)
+        message = data.get("message") or {}
+        calls = []
+        for i, call in enumerate(message.get("tool_calls") or []):
+            arguments = call["function"].get("arguments") or {}
+            if isinstance(arguments, str):  # some models return the arguments as a JSON string
+                try:
+                    arguments = json.loads(arguments)
+                except json.JSONDecodeError:
+                    arguments = {}
+            calls.append(ToolCall(call.get("id") or f"call_{i}", call["function"]["name"], dict(arguments)))
+        stop = "tool_use" if calls else "max_tokens" if data.get("done_reason") == "length" else "end_turn"
+        usage = {"input_tokens": data.get("prompt_eval_count", 0), "output_tokens": data.get("eval_count", 0)}
+        return LLMResponse(message.get("content") or "", calls, stop, data.get("model", self.model), usage, 0.0)
+
+
+def ollama_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The agent's Claude-shaped messages as Ollama chat messages: text stays text, a
+    tool_use block becomes a tool call, a tool_result block becomes a "tool" message,
+    and thinking blocks are dropped."""
+    out: list[dict[str, Any]] = []
+    names: dict[str, str] = {}
+    for message in messages:
+        content = message["content"]
+        if isinstance(content, str):
+            out.append({"role": message["role"], "content": content})
+            continue
+        text, calls = [], []
+        for block in content:
+            kind = block.get("type")
+            if kind == "text":
+                text.append(block["text"])
+            elif kind == "tool_use":
+                names[block["id"]] = block["name"]
+                calls.append({"function": {"name": block["name"], "arguments": block["input"]}})
+            elif kind == "tool_result":
+                result = block["content"] if isinstance(block["content"], str) else json.dumps(block["content"])
+                out.append({"role": "tool", "content": result, "tool_name": names.get(block["tool_use_id"], "")})
+        if text or calls:
+            entry: dict[str, Any] = {"role": message["role"], "content": "\n".join(text)}
+            if calls:
+                entry["tool_calls"] = calls
+            out.append(entry)
+    return out

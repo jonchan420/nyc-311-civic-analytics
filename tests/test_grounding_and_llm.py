@@ -11,7 +11,8 @@ import pytest
 
 from analyst.agent import strict_schema, tool_definitions
 from analyst.grounding import check, numbers_in, percents_in
-from analyst.llm import BudgetExceeded, BudgetGuard, ClaudeClient, ProviderError, estimate_cost
+from analyst.llm import (BudgetExceeded, BudgetGuard, ClaudeClient, OllamaClient, ProviderError, estimate_cost,
+                         ollama_messages)
 from analyst.schemas import ComparePeriodsParams
 
 RESULT = {"summary": {"total_a": 244972, "total_b": 261150, "change": 16178, "pct_change": 6.6},
@@ -174,3 +175,61 @@ def test_claude_client_refusal_and_errors():
     with pytest.raises(BudgetExceeded):
         blocked.complete(system="s", messages=[])
     assert blocked._client.beta.messages.requests == []   # nothing was sent
+
+
+class FakeSession:
+    """Stands in for requests.Session: records the body and returns a canned Ollama reply."""
+
+    def __init__(self, reply=None, error=None):
+        self.reply, self.error, self.bodies = reply, error, []
+
+    def post(self, url, json, timeout):
+        self.bodies.append((url, json))
+        if self.error:
+            raise self.error
+        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: self.reply)
+
+
+def test_ollama_client_request_and_response():
+    reply = {"model": "qwen3:8b", "done_reason": "stop", "prompt_eval_count": 780, "eval_count": 42,
+             "message": {"role": "assistant", "content": "",
+                         "tool_calls": [{"id": "call_1", "function": {"name": "forecast_status", "arguments": {}}}]}}
+    session = FakeSession(reply)
+    response = OllamaClient(session=session).complete(system="rules", messages=[{"role": "user", "content": "q"}],
+                                                      tools=tool_definitions(), max_tokens=900)
+    url, body = session.bodies[0]
+    assert url == "http://127.0.0.1:11434/api/chat"
+    assert body["messages"] == [{"role": "system", "content": "rules"}, {"role": "user", "content": "q"}]
+    assert (body["model"], body["stream"], body["think"]) == ("qwen3:8b", False, False)
+    assert body["options"]["temperature"] == 0 and body["options"]["num_predict"] == 900
+    first = body["tools"][0]
+    assert first["type"] == "function" and first["function"]["parameters"] == tool_definitions()[0]["input_schema"]
+    assert [(c.id, c.name, c.input) for c in response.tool_calls] == [("call_1", "forecast_status", {})]
+    assert (response.stop_reason, response.cost_usd, response.usage) == (
+        "tool_use", 0.0, {"input_tokens": 780, "output_tokens": 42})
+
+
+def test_ollama_messages_translate_a_retry():
+    messages = [
+        {"role": "user", "content": "q"},
+        {"role": "assistant", "content": [{"type": "thinking", "thinking": "", "signature": "s"},
+                                          {"type": "tool_use", "id": "toolu_1", "name": "month_summary",
+                                           "input": {"geography": "LONG ISLAND"}}]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_1", "is_error": True,
+                                      "content": "Invalid parameters: geography"}]},
+    ]
+    assert ollama_messages(messages) == [
+        {"role": "user", "content": "q"},
+        {"role": "assistant", "content": "",
+         "tool_calls": [{"function": {"name": "month_summary", "arguments": {"geography": "LONG ISLAND"}}}]},
+        {"role": "tool", "content": "Invalid parameters: geography", "tool_name": "month_summary"},
+    ]
+
+
+def test_ollama_client_string_arguments_and_errors():
+    reply = {"message": {"content": "", "tool_calls": [{"function": {"name": "month_summary",
+                                                                     "arguments": '{"geography": "QUEENS"}'}}]}}
+    response = OllamaClient(session=FakeSession(reply)).complete(system="s", messages=[])
+    assert response.tool_calls[0].input == {"geography": "QUEENS"} and response.tool_calls[0].id == "call_0"
+    with pytest.raises(ProviderError, match="ConnectionError"):
+        OllamaClient(session=FakeSession(error=ConnectionError("refused"))).complete(system="s", messages=[])
