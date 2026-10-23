@@ -9,7 +9,6 @@ parameters; it never writes SQL.
 
 from __future__ import annotations
 
-import difflib
 import hashlib
 import json
 from datetime import date, datetime, timezone
@@ -18,7 +17,7 @@ from typing import Any
 
 import duckdb
 
-from analyst.catalog import BOROUGHS, RENAMES_CHECKED_FROM, category_key, renamed_to
+from analyst.catalog import BOROUGHS, CATALOG_FILE, CategoryCatalog
 from analyst.schemas import (
     CategoryChange,
     ComparePeriodsParams,
@@ -77,11 +76,7 @@ WHERE list_contains($boroughs, borough)
   AND (month BETWEEN $a_start AND $a_end OR month BETWEEN $b_start AND $b_end)
 """
 
-LABEL_TOTALS_SQL = """
-SELECT complaint_type, SUM(complaint_count) AS total
-FROM borough_category
-GROUP BY complaint_type
-"""
+LABELS_SQL = "SELECT DISTINCT complaint_type FROM borough_category"
 
 CITYWIDE_SQL = """
 SELECT strftime(CAST(month AS DATE), '%Y-%m'), complaint_count
@@ -109,25 +104,26 @@ def compare_periods(
     con = _connect(data_dir, citywide)
     try:
         _check_coverage(con, params, window, meta["complete_through"])
-        names = _display_names(con)
-        wanted = _resolve_categories(params.categories, names) if params.categories else None
+        all_labels = [label for (label,) in con.execute(LABELS_SQL).fetchall()]
         counts = con.execute(COUNTS_SQL, window).fetchall()
         city = (_citywide_total(con, params.period_a), _citywide_total(con, params.period_b)) if citywide else None
     finally:
         con.close()
+    catalog = CategoryCatalog.load(data_dir).including(all_labels)
+    wanted = _resolve_categories(params.categories, catalog) if params.categories else None
 
     # Combine raw labels into categories (spelling variants, renames).
     groups: dict[str, dict[str, Any]] = {}
     for label, count_a, count_b in counts:
-        key = category_key(label)
-        if wanted is not None and key not in wanted:
+        entry = catalog.lookup(label)
+        if wanted is not None and entry.category_id not in wanted:
             continue
-        group = groups.setdefault(key, {"a": 0, "b": 0, "labels": []})
+        group = groups.setdefault(entry.category_id, {"name": entry.category, "a": 0, "b": 0, "labels": []})
         group["a"] += int(count_a)
         group["b"] += int(count_b)
         group["labels"].append(label)
-    for key in wanted or []:  # a requested category with no complaints still gets a row
-        groups.setdefault(key, {"a": 0, "b": 0, "labels": []})
+    for category_id, name in (wanted or {}).items():  # a requested category with no complaints still gets a row
+        groups.setdefault(category_id, {"name": name, "a": 0, "b": 0, "labels": []})
 
     total_a = sum(g["a"] for g in groups.values())
     total_b = sum(g["b"] for g in groups.values())
@@ -135,8 +131,8 @@ def compare_periods(
     shareable = total_change != 0 and abs(total_change) >= MIN_SHARE_BASE_PCT / 100 * total_a
 
     rows = [
-        _category_row(names[key], g["a"], g["b"], g["labels"], total_change if shareable else None)
-        for key, g in groups.items()
+        _category_row(g["name"], g["a"], g["b"], g["labels"], total_change if shareable else None, catalog)
+        for g in groups.values()
     ]
     rows.sort(key=lambda row: (-abs(row.change), row.category))
     shown = rows[: params.top_n]
@@ -156,6 +152,8 @@ def compare_periods(
         summary["citywide_total_a"], summary["citywide_total_b"] = city
 
     sources = [data_dir / CATEGORY_FILE, data_dir / METADATA_FILE]
+    if catalog.source:
+        sources.append(catalog.source)
     if citywide:
         sources.append(data_dir / CITYWIDE_FILE)
     provenance = Provenance(
@@ -163,18 +161,21 @@ def compare_periods(
         params=params.model_dump(mode="json"),
         unit=UNIT,
         calculation=CALCULATION,
-        filters=_filters(params, [names[key] for key in wanted] if wanted else None),
+        filters=_filters(params, list(wanted.values()) if wanted else None),
         sources=[_source(path) for path in sources],
         data_complete_through=meta["complete_through"],
         data_refreshed_at=meta["refreshed_at"],
         computed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
-    warnings = _warnings(params, rows, shown, total_a, total_b, total_change, shareable, city)
+    warnings = _warnings(rows, shown, total_a, total_b, total_change, shareable, city, catalog)
     return ToolResult[CategoryChange](summary=summary, rows=shown, warnings=warnings, provenance=provenance)
 
 
-def _category_row(name: str, a: int, b: int, labels: list[str], total_change: int | None) -> CategoryChange:
+def _category_row(
+    name: str, a: int, b: int, labels: list[str], total_change: int | None, catalog: CategoryCatalog
+) -> CategoryChange:
     change = b - a
+    kinds = {catalog.lookup(label).kind for label in labels}
     flags = []
     if a == 0 and b > 0:
         flags.append("new_in_b")
@@ -182,8 +183,10 @@ def _category_row(name: str, a: int, b: int, labels: list[str], total_change: in
         flags.append("absent_in_b")
     if a < SMALL_COUNT and b < SMALL_COUNT:
         flags.append("small_count")
-    if any(renamed_to(label) for label in labels):
+    if "renamed" in kinds:
         flags.append("renamed")
+    if "unreviewed" in kinds:
+        flags.append("unreviewed")
     return CategoryChange(
         category=name,
         count_a=a,
@@ -197,7 +200,6 @@ def _category_row(name: str, a: int, b: int, labels: list[str], total_change: in
 
 
 def _warnings(
-    params: ComparePeriodsParams,
     rows: list[CategoryChange],
     shown: list[CategoryChange],
     total_a: int,
@@ -205,20 +207,27 @@ def _warnings(
     total_change: int,
     shareable: bool,
     city: tuple[int, int] | None,
+    catalog: CategoryCatalog,
 ) -> list[str]:
     warnings = []
+    if catalog.source is None:
+        warnings.append(
+            f"No {CATALOG_FILE} was found, so renamed categories aren't combined; "
+            "only spellings that differ in case or punctuation are."
+        )
     for row in rows:
         for label in row.labels:
-            rename = renamed_to(label)
-            if rename:
+            entry = catalog.lookup(label)
+            if entry.kind == "renamed":
+                when = f" in {_month_name(entry.renamed_in)}" if entry.renamed_in else ""
                 warnings.append(
-                    f'"{label}" was renamed "{rename[0]}" after {_month_name(rename[1])}; '
-                    "both labels are counted together."
+                    f'"{label}" was renamed "{entry.category}"{when}; both labels are counted together.'
                 )
-    if params.period_a.start < RENAMES_CHECKED_FROM:
+    unreviewed = [row.category for row in rows if "unreviewed" in row.flags]
+    if unreviewed:
         warnings.append(
-            f"Category renames before {_month_name(RENAMES_CHECKED_FROM)} aren't mapped yet, "
-            "so a row flagged new_in_b or absent_in_b may be a rename, not a real change."
+            f"{', '.join(unreviewed)}: not yet in the category catalog, so a rename of an older "
+            "category would not be recognized."
         )
 
     def named(flag: str) -> str:
@@ -333,30 +342,17 @@ def _check_coverage(
         )
 
 
-def _display_names(con: duckdb.DuckDBPyConnection) -> dict[str, str]:
-    """Name each category by its most-used current spelling ("Elevator", not "ELEVATOR").
-    An old, renamed label never names its category; the label that replaced it does."""
-    best: dict[str, tuple[int, str]] = {}
-    for label, total in con.execute(LABEL_TOTALS_SQL).fetchall():
-        rename = renamed_to(label)
-        candidate = (-1, rename[0]) if rename else (int(total), label)
-        key = category_key(label)
-        current = best.get(key)
-        if current is None or (-candidate[0], candidate[1]) < (-current[0], current[1]):
-            best[key] = candidate
-    return {key: name for key, (_, name) in best.items()}
-
-
-def _resolve_categories(requested: list[str], names: dict[str, str]) -> list[str]:
-    keys = []
-    for label in requested:
-        key = category_key(label)
-        if key not in names:
-            close = difflib.get_close_matches(label, sorted(set(names.values())), n=3, cutoff=0.6)
+def _resolve_categories(requested: list[str], catalog: CategoryCatalog) -> dict[str, str]:
+    """category_id -> name for each requested category, in the order asked."""
+    found: dict[str, str] = {}
+    for text in requested:
+        entry = catalog.find(text)
+        if entry is None:
+            close = catalog.suggest(text)
             hint = f" Closest matches: {', '.join(close)}." if close else ""
-            raise UnknownCategoryError(f'No complaint type called "{label}" is in the data.{hint}')
-        keys.append(key)
-    return list(dict.fromkeys(keys))  # drop duplicates, keep order
+            raise UnknownCategoryError(f'No complaint type called "{text}" is in the data.{hint}')
+        found.setdefault(entry.category_id, entry.category)
+    return found
 
 
 def _citywide_total(con: duckdb.DuckDBPyConnection, period: MonthRange) -> int:

@@ -11,7 +11,6 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-from analyst.catalog import category_key
 from analyst.schemas import CategoryChange, ComparePeriodsParams, ToolResult
 from analyst.tools import DataUnavailableError, UnknownCategoryError, compare_periods
 from config.settings import PROJECT_ROOT
@@ -72,16 +71,33 @@ def test_spelling_variants_and_renames_are_combined(fixture_dir):
     assert "Sewer" not in rows  # the old name never becomes its own row
 
 
-def test_category_key():
-    assert category_key("Heat/Hot Water") == category_key("HEAT/HOT WATER")
-    assert category_key("Litter Basket / Request") == category_key("Litter Basket Request")
-    assert category_key("Water System") == category_key("Water Maintenance")
-    assert category_key("Illegal Parking") != category_key("Illegal Dumping")
+def test_without_a_catalog_only_spellings_are_combined(tmp_path):
+    data_dir = write_fixtures(tmp_path)
+    (data_dir / "category_catalog.csv").unlink()
+    result = run(data_dir)
+    rows = {r.category: r for r in result.rows}
+    assert rows["HEAT/HOT WATER"].labels == ["HEAT/HOT WATER", "Heat/Hot Water"]
+    assert (rows["Sewer"].count_a, rows["Sewer"].count_b) == (80, 0)
+    assert (rows["Sewer Maintenance"].count_a, rows["Sewer Maintenance"].count_b) == (0, 90)
+    assert any("No category_catalog.csv was found" in w for w in result.warnings)
+
+
+def test_a_label_the_catalog_has_not_seen_is_flagged(tmp_path):
+    data_dir = write_fixtures(tmp_path)
+    path = data_dir / "monthly_borough_category.parquet"
+    table = pd.read_parquet(path)
+    new = pd.DataFrame({"month": pd.to_datetime(["2026-01-01", "2026-02-01"]).astype("datetime64[us]"),
+                        "borough": "QUEENS", "complaint_type": "Street Light Outage", "complaint_count": [25, 35]})
+    pd.concat([table, new]).to_parquet(path, index=False)
+    result = run(data_dir)
+    row = {r.category: r for r in result.rows}["Street Light Outage"]
+    assert (row.count_a, row.count_b, row.flags) == (0, 60, ["new_in_b", "unreviewed"])
+    assert any("Street Light Outage: not yet in the category catalog" in w for w in result.warnings)
 
 
 def test_warnings_explain_every_flag(fixture_dir):
     warnings = " ".join(run(fixture_dir).warnings)
-    assert '"Sewer" was renamed "Sewer Maintenance"' in warnings
+    assert '"Sewer" was renamed "Sewer Maintenance" in Jan 2026' in warnings
     assert "No complaints in period A for Cannabis Retailer" in warnings
     assert "No complaints in period B for Vending" in warnings
     assert "Fewer than 20 complaints in both periods for Vending" in warnings
@@ -182,7 +198,9 @@ def test_provenance_records_inputs_and_file_versions(fixture_dir):
     assert provenance.data_refreshed_at == "2026-03-05T10:00:00"
     assert provenance.unit.startswith("recorded 311 service requests")
     assert provenance.filters[0] == "geography: Queens; complaints with no borough recorded are excluded"
-    for name, source in zip(["monthly_borough_category.parquet", "metadata.json"], provenance.sources):
+    names = ["monthly_borough_category.parquet", "metadata.json", "category_catalog.csv"]
+    assert len(provenance.sources) == len(names)
+    for name, source in zip(names, provenance.sources):
         assert source.path.endswith(name)
         assert source.sha256 == hashlib.sha256((fixture_dir / name).read_bytes()).hexdigest()
 

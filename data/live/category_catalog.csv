@@ -1,0 +1,275 @@
+label,category_id,category,kind,renamed_in,note
+Abandoned Bike,abandoned-bike,Abandoned Bike,current,,
+Derelict Bicycle,abandoned-bike,Abandoned Bike,renamed,2021-10,DSNY; handover Sep 2021
+Abandoned Vehicle,abandoned-vehicle,Abandoned Vehicle,current,,
+Adopt-A-Basket,adopt-a-basket,Adopt-A-Basket,current,,last used 2024-08
+AHV Inspection Unit,ahv-inspection-unit,AHV Inspection Unit,current,,
+Air Quality,air-quality,Air Quality,current,,
+Animal Facility - No Permit,animal-facility-no-permit,Animal Facility - No Permit,current,,
+Animal in a Park,animal-in-a-park,Animal in a Park,current,,
+Animal-Abuse,animal-abuse,Animal-Abuse,current,,
+APPLIANCE,appliance,APPLIANCE,current,,
+Appliance,appliance,APPLIANCE,spelling,,last used 2023-10
+Asbestos,asbestos,Asbestos,current,,
+ASBESTOS,asbestos,Asbestos,spelling,,last used 2025-03
+Beach/Pool/Sauna Complaint,beach-pool-sauna-complaint,Beach/Pool/Sauna Complaint,current,,
+Bench,bench,Bench,current,,
+BEST/Site Safety,best-site-safety,BEST/Site Safety,current,,
+Bike Rack,bike-rack,Bike Rack,current,,
+Bike Rack Condition,bike-rack,Bike Rack,renamed,2024-08,DOT; handover Jul-Aug 2024
+Bike/Roller/Skate,bike-roller-skate,Bike/Roller/Skate,current,,
+Bike/Roller/Skate Chronic,bike-roller-skate,Bike/Roller/Skate,renamed,2025-11,NYPD; identical descriptors; handover Nov 2025
+Blocked Driveway,blocked-driveway,Blocked Driveway,current,,
+Boiler,boiler,Boiler,current,,last used 2023-10
+Boilers,boilers,Boilers,current,,
+Borough Office,borough-office,Borough Office,current,,
+Bottled Water,bottled-water,Bottled Water,current,,last used 2023-06
+Bridge Condition,bridge-condition,Bridge Condition,current,,
+Broken Parking Meter,broken-parking-meter,Broken Parking Meter,current,,
+Building Condition,building-condition,Building Condition,current,,
+Building Drinking Water Tank,building-drinking-water-tank,Building Drinking Water Tank,current,,
+Building Marshal's Office,building-marshal-s-office,Building Marshal's Office,current,,
+Building Marshals office,building-marshals-office,Building Marshals office,current,,last used 2026-04
+Building/Use,building-use,Building/Use,current,,
+Bus Stop Shelter Complaint,bus-stop-shelter-complaint,Bus Stop Shelter Complaint,current,,
+Bus Stop Shelter Placement,bus-stop-shelter-placement,Bus Stop Shelter Placement,current,,
+Calorie Labeling,calorie-labeling,Calorie Labeling,current,,
+Cannabis Retailer,cannabis-retailer,Cannabis Retailer,current,,
+Change Collection Schedule,change-collection-schedule,Change Collection Schedule,current,,last used 2021-09
+Collection Truck Noise,collection-truck-noise,Collection Truck Noise,current,,ended Sep 2021; no clear successor label
+Commercial Disposal Complaint,commercial-disposal-complaint,Commercial Disposal Complaint,current,,
+Construction Lead Dust,construction-lead-dust,Construction Lead Dust,current,,
+Construction Safety Enforcement,construction-safety-enforcement,Construction Safety Enforcement,current,,last used 2026-04
+Consumer Complaint,consumer-complaint,Consumer Complaint,current,,
+Cooling Tower,cooling-tower,Cooling Tower,current,,
+COVID-19 Non-essential Construction,covid-19-non-essential-construction,COVID-19 Non-essential Construction,current,,last used 2022-03
+Cranes and Derricks,cranes-and-derricks,Cranes and Derricks,current,,
+Curb Condition,curb-condition,Curb Condition,current,,
+Damaged Tree,damaged-tree,Damaged Tree,current,,
+Day Care,day-care,Day Care,current,,
+Dead Animal,dead-animal,Dead Animal,current,,
+Dead/Dying Tree,dead-dying-tree,Dead/Dying Tree,current,,
+DEP Bridge Condition,dep-bridge-condition,DEP Bridge Condition,current,,last used 2021-10
+DEP Highway Condition,dep-highway-condition,DEP Highway Condition,current,,last used 2026-06
+DEP Sidewalk Condition,dep-sidewalk-condition,DEP Sidewalk Condition,current,,
+DEP Street Condition,dep-street-condition,DEP Street Condition,current,,
+Dept of Investigations,dept-of-investigations,Dept of Investigations,current,,
+Derelict Vehicles,derelict-vehicles,Derelict Vehicles,current,,
+Dirty Condition,dirty-condition,Dirty Condition,current,,
+Dirty Conditions,dirty-condition,Dirty Condition,renamed,2021-10,DSNY; handover Sep-Oct 2021 at similar volume
+Disorderly Youth,disorderly-youth,Disorderly Youth,current,,
+Dispatched Taxi Complaint,dispatched-taxi-complaint,Dispatched Taxi Complaint,current,,last used 2024-11
+Dispatched Taxi Compliment,dispatched-taxi-compliment,Dispatched Taxi Compliment,current,,last used 2023-05
+DOB Posted Notice or Order,dob-posted-notice-or-order,DOB Posted Notice or Order,current,,last used 2023-10
+DOOR/WINDOW,door-window,DOOR/WINDOW,current,,
+Door/Window,door-window,DOOR/WINDOW,spelling,,last used 2023-10
+Drinking,drinking,Drinking,current,,
+Drinking Water,drinking-water,Drinking Water,current,,
+Drug Activity,drug-activity,Drug Activity,current,,
+DSNY Internal,dsny-internal,DSNY Internal,current,,last used 2026-04
+DSNY Spillage,dsny-spillage,DSNY Spillage,current,,last used 2020-12
+Dumpster Complaint,dumpster-complaint,Dumpster Complaint,current,,
+E-Scooter,e-scooter,E-Scooter,current,,
+ELECTRIC,electric,ELECTRIC,current,,
+Electric,electric,ELECTRIC,spelling,,last used 2023-10
+Electrical,electrical,Electrical,current,,
+Electronics Waste,electronics-waste,Electronics Waste,current,,last used 2020-02
+Electronics Waste Appointment,electronics-waste-appointment,Electronics Waste Appointment,current,,ended Oct 2023 with no successor label in this data
+Elevator,elevator,Elevator,current,,
+ELEVATOR,elevator,Elevator,spelling,,
+Emergency Response Team (ERT),emergency-response-team-ert,Emergency Response Team (ERT),current,,
+Employee Behavior,employee-behavior,Employee Behavior,current,,last used 2020-09
+Encampment,encampment,Encampment,current,,
+Homeless Encampment,encampment,Encampment,renamed,2020-02,NYPD; identical descriptors; old label used only Jan-Apr 2020
+Executive Inspections,executive-inspections,Executive Inspections,current,,last used 2024-06
+Facade Insp Safety Pgm,facade-insp-safety-pgm,Facade Insp Safety Pgm,current,,last used 2024-12
+Facades,facades,Facades,current,,last used 2022-03
+Face Covering Violation,face-covering-violation,Face Covering Violation,current,,last used 2023-06
+Ferry Complaint,ferry-complaint,Ferry Complaint,current,,last used 2020-04
+Ferry Inquiry,ferry-inquiry,Ferry Inquiry,current,,last used 2020-03
+FHV Licensee Complaint,fhv-licensee-complaint,FHV Licensee Complaint,current,,last used 2026-06
+FLOORING/STAIRS,flooring-stairs,FLOORING/STAIRS,current,,
+Flooring/Stairs,flooring-stairs,FLOORING/STAIRS,spelling,,last used 2023-10
+Foam Ban Enforcement,foam-ban-enforcement,Foam Ban Enforcement,current,,last used 2021-08
+Food Establishment,food-establishment,Food Establishment,current,,
+Food Poisoning,food-poisoning,Food Poisoning,current,,
+For Hire Vehicle Complaint,for-hire-vehicle-complaint,For Hire Vehicle Complaint,current,,
+For Hire Vehicle Report,for-hire-vehicle-report,For Hire Vehicle Report,current,,
+Forensic Engineering,forensic-engineering,Forensic Engineering,current,,last used 2021-12
+Found Property,found-property,Found Property,current,,
+GENERAL,general,GENERAL,current,,
+General,general,GENERAL,spelling,,last used 2023-10
+General Construction/Plumbing,general-construction-plumbing,General Construction/Plumbing,current,,
+Graffiti,graffiti,Graffiti,current,,
+Green Infrastructure,green-infrastructure,Green Infrastructure,current,,
+Green Taxi Complaint,green-taxi-complaint,Green Taxi Complaint,current,,
+Green Taxi Report,green-taxi-report,Green Taxi Report,current,,
+Harboring Bees/Wasps,harboring-bees-wasps,Harboring Bees/Wasps,current,,
+Hazardous Material,hazardous-material,Hazardous Material,current,,
+Hazardous Materials,hazardous-material,Hazardous Material,renamed,2026-08,DEP; handover Jul-Aug 2026
+HEAT/HOT WATER,heat-hot-water,HEAT/HOT WATER,current,,
+Heat/Hot Water,heat-hot-water,HEAT/HOT WATER,spelling,,last used 2023-10
+Highway Condition,highway-condition,Highway Condition,current,,
+Highway Sign - Damaged,highway-sign-damaged,Highway Sign - Damaged,current,,
+Highway Sign - Dangling,highway-sign-dangling,Highway Sign - Dangling,current,,
+Highway Sign - Missing,highway-sign-missing,Highway Sign - Missing,current,,
+Home Delivered Meal - Missed Delivery,home-delivered-meal-missed-delivery,Home Delivered Meal - Missed Delivery,current,,last used 2022-01
+Home Delivered Meal Complaint,home-delivered-meal-complaint,Home Delivered Meal Complaint,current,,last used 2020-01
+Homeless Person Assistance,homeless-person-assistance,Homeless Person Assistance,current,,
+Homeless Street Condition,homeless-street-condition,Homeless Street Condition,current,,"ended Mar 2021; Encampment already existed alongside it, so it isn't treated as a rename"
+Illegal Animal Kept as Pet,illegal-animal-kept-as-pet,Illegal Animal Kept as Pet,current,,
+Illegal Animal Sold,illegal-animal-sold,Illegal Animal Sold,current,,
+Illegal Dumping,illegal-dumping,Illegal Dumping,current,,
+Illegal Fireworks,illegal-fireworks,Illegal Fireworks,current,,
+Illegal Parking,illegal-parking,Illegal Parking,current,,
+Illegal Posting,illegal-posting,Illegal Posting,current,,
+Illegal Tree Damage,illegal-tree-damage,Illegal Tree Damage,current,,
+Incorrect Data,incorrect-data,Incorrect Data,current,,
+Indoor Air Quality,indoor-air-quality,Indoor Air Quality,current,,
+Indoor Sewage,indoor-sewage,Indoor Sewage,current,,
+Industrial Waste,industrial-waste,Industrial Waste,current,,
+Institution Disposal Complaint,institution-disposal-complaint,Institution Disposal Complaint,current,,
+Internal Code,internal-code,Internal Code,current,,last used 2023-03
+Investigations and Discipline (IAD),investigations-and-discipline-iad,Investigations and Discipline (IAD),current,,
+Lead,lead,Lead,current,,
+Leaning Bar,leaning-bar,Leaning Bar,current,,last used 2026-06
+Lifeguard,lifeguard,Lifeguard,current,,
+LinkNYC,linknyc,LinkNYC,current,,
+Litter Basket Complaint,litter-basket-complaint,Litter Basket Complaint,current,,
+Overflowing Litter Baskets,litter-basket-complaint,Litter Basket Complaint,renamed,2021-10,DSNY; handover Sep 2021; the new label also covers basket misuse
+Litter Basket Request,litter-basket-request,Litter Basket Request,current,,
+Litter Basket / Request,litter-basket-request,Litter Basket Request,spelling,,last used 2021-09
+Lost Property,lost-property,Lost Property,current,,
+Lot Condition,lot-condition,Lot Condition,current,,
+Vacant Lot,lot-condition,Lot Condition,renamed,2021-10,DSNY; lot-cleaning requests; handover Sep 2021
+Maintenance or Facility,maintenance-or-facility,Maintenance or Facility,current,,
+Mass Gathering Complaint,mass-gathering-complaint,Mass Gathering Complaint,current,,last used 2022-02
+Miscellaneous Categories,miscellaneous-categories,Miscellaneous Categories,current,,last used 2021-11
+Missed Collection,missed-collection,Missed Collection,current,,
+Missed Collection (All Materials),missed-collection,Missed Collection,renamed,2021-10,DSNY; handover Sep-Oct 2021
+Mobile Food Vendor,mobile-food-vendor,Mobile Food Vendor,current,,
+Mold,mold,Mold,current,,
+MOLD,mold,Mold,spelling,,last used 2022-02
+Mosquitoes,mosquitoes,Mosquitoes,current,,
+Municipal Parking Facility,municipal-parking-facility,Municipal Parking Facility,current,,last used 2023-05
+New Tree Request,new-tree-request,New Tree Request,current,,
+Noise,noise,Noise,current,,
+Noise - Commercial,noise-commercial,Noise - Commercial,current,,
+Noise - Helicopter,noise-helicopter,Noise - Helicopter,current,,
+Noise - House of Worship,noise-house-of-worship,Noise - House of Worship,current,,
+Noise - Park,noise-park,Noise - Park,current,,
+Noise - Residential,noise-residential,Noise - Residential,current,,
+Noise - Street/Sidewalk,noise-street-sidewalk,Noise - Street/Sidewalk,current,,
+Noise - Vehicle,noise-vehicle,Noise - Vehicle,current,,
+Non-Emergency Police Matter,non-emergency-police-matter,Non-Emergency Police Matter,current,,
+Non-Residential Heat,non-residential-heat,Non-Residential Heat,current,,last used 2026-05
+NonCompliance with Phased Reopening,noncompliance-with-phased-reopening,NonCompliance with Phased Reopening,current,,last used 2021-07
+Obstruction,obstruction,Obstruction,current,,
+Oil or Gas Spill,oil-or-gas-spill,Oil or Gas Spill,current,,
+Other Enforcement,other-enforcement,Other Enforcement,current,,ended Sep 2021; no clear successor label
+Outdoor Dining,outdoor-dining,Outdoor Dining,current,,
+OUTSIDE BUILDING,outside-building,OUTSIDE BUILDING,current,,
+Outside Building,outside-building,OUTSIDE BUILDING,spelling,,last used 2023-10
+Overgrown Tree/Branches,overgrown-tree-branches,Overgrown Tree/Branches,current,,
+PAINT/PLASTER,paint-plaster,PAINT/PLASTER,current,,
+Paint/Plaster,paint-plaster,PAINT/PLASTER,spelling,,last used 2023-10
+Panhandling,panhandling,Panhandling,current,,
+Peeling Paint,peeling-paint,Peeling Paint,current,,last used 2024-12
+Pet Sale,pet-sale,Pet Sale,current,,
+Pet Shop,pet-sale,Pet Sale,renamed,2025-06,DOHMH; handover Jun 2025
+PLUMBING,plumbing,PLUMBING,current,,
+Plumbing,plumbing,PLUMBING,spelling,,
+Poison Ivy,poison-ivy,Poison Ivy,current,,
+Posting Advertisement,posting-advertisement,Posting Advertisement,current,,
+Private or Charter School Reopening,private-or-charter-school-reopening,Private or Charter School Reopening,current,,last used 2022-03
+Private School Vaccine Mandate Non-Compliance,private-school-vaccine-mandate-non-compliance,Private School Vaccine Mandate Non-Compliance,current,,last used 2023-01
+Public Payphone Complaint,public-payphone-complaint,Public Payphone Complaint,current,,
+Public Toilet,public-toilet,Public Toilet,current,,
+Quality of Life,quality-of-life,Quality of Life,current,,last used 2023-08
+Radioactive Material,radioactive-material,Radioactive Material,current,,
+Real Time Enforcement,real-time-enforcement,Real Time Enforcement,current,,
+Recycling Basket Complaint,recycling-basket-complaint,Recycling Basket Complaint,current,,
+Overflowing Recycling Baskets,recycling-basket-complaint,Recycling Basket Complaint,renamed,2021-10,DSNY; handover Sep-Oct 2021; very small volume
+Recycling Enforcement,recycling-enforcement,Recycling Enforcement,current,,ended Sep 2021; no clear successor label
+Request Large Bulky Item Collection,request-large-bulky-item-collection,Request Large Bulky Item Collection,current,,ended Sep 2022 with no successor label in this data
+Residential Disposal Complaint,residential-disposal-complaint,Residential Disposal Complaint,current,,
+Retailer Complaint,retailer-complaint,Retailer Complaint,current,,last used 2024-04
+Rodent,rodent,Rodent,current,,
+Root/Sewer/Sidewalk Condition,root-sewer-sidewalk-condition,Root/Sewer/Sidewalk Condition,current,,
+SAFETY,safety,SAFETY,current,,
+Safety,safety,SAFETY,spelling,,last used 2026-03
+Sanitation Condition,sanitation-condition,Sanitation Condition,current,,"ended Sep 2021 as DSNY relabeled its complaints; its mix (mostly dump-outs, also dead animals and weeds) has no single successor label"
+Sanitation Worker or Vehicle Complaint,sanitation-worker-or-vehicle-complaint,Sanitation Worker or Vehicle Complaint,current,,
+Scaffold Safety,scaffold-safety,Scaffold Safety,current,,
+School Maintenance,school-maintenance,School Maintenance,current,,last used 2026-03
+Seasonal Collection,seasonal-collection,Seasonal Collection,current,,last used 2024-01
+Sewer Maintenance,sewer-maintenance,Sewer Maintenance,current,,
+Sewer,sewer-maintenance,Sewer Maintenance,renamed,2026-08,DEP; handover Jul-Aug 2026
+Sidewalk Condition,sidewalk-condition,Sidewalk Condition,current,,
+Smoking or Vaping,smoking-or-vaping,Smoking or Vaping,current,,
+Smoking,smoking-or-vaping,Smoking or Vaping,renamed,2024-04,"DOHMH; both labels used Dec 2023-Mar 2024, then the new one dominates"
+Snow or Ice,snow-or-ice,Snow or Ice,current,,
+Snow,snow-or-ice,Snow or Ice,renamed,2021-10,"DSNY; icy sidewalks and plowing; old label ends Mar 2021, new one starts the next winter"
+Snow Removal,snow-or-ice,Snow or Ice,renamed,2021-10,"DSNY; old label ends Feb 2021, new one starts the next winter"
+SNW,snw,SNW,current,,last used 2026-01
+Special Natural Area District (SNAD),special-natural-area-district-snad,Special Natural Area District (SNAD),current,,
+Special Operations,special-operations,Special Operations,current,,
+Special Projects Inspection Team (SPIT),special-projects-inspection-team-spit,Special Projects Inspection Team (SPIT),current,,
+Squeegee,squeegee,Squeegee,current,,
+SRDE,srde,SRDE,current,,last used 2023-03
+SRGOVG,srgovg,SRGOVG,current,,last used 2021-08
+Stalled Sites,stalled-sites,Stalled Sites,current,,last used 2024-08
+Standing Water,standing-water,Standing Water,current,,
+Storm,storm,Storm,current,,last used 2021-09
+Street Condition,street-condition,Street Condition,current,,
+Street Light Condition,street-light-condition,Street Light Condition,current,,
+Street Sign - Damaged,street-sign-damaged,Street Sign - Damaged,current,,
+Street Sign - Dangling,street-sign-dangling,Street Sign - Dangling,current,,
+Street Sign - Missing,street-sign-missing,Street Sign - Missing,current,,
+Street Sweeping Complaint,street-sweeping-complaint,Street Sweeping Complaint,current,,
+Sweeping/Inadequate,street-sweeping-complaint,Street Sweeping Complaint,renamed,2021-09,DSNY; sweeping labels merged into one in Sep 2021
+Sweeping/Missed,street-sweeping-complaint,Street Sweeping Complaint,renamed,2021-09,DSNY; sweeping labels merged into one in Sep 2021
+Sweeping/Missed-Inadequate,street-sweeping-complaint,Street Sweeping Complaint,renamed,2021-09,DSNY; sweeping labels merged into one in Sep 2021
+Sustainability Enforcement,sustainability-enforcement,Sustainability Enforcement,current,,last used 2024-04
+Tanning,tanning,Tanning,current,,
+Tattooing,tattooing,Tattooing,current,,
+Taxi Complaint,taxi-complaint,Taxi Complaint,current,,
+Taxi Compliment,taxi-compliment,Taxi Compliment,current,,
+Taxi Licensee Complaint,taxi-licensee-complaint,Taxi Licensee Complaint,current,,
+Taxi Report,taxi-report,Taxi Report,current,,
+Tobacco or Non-Tobacco Sale,tobacco-or-non-tobacco-sale,Tobacco or Non-Tobacco Sale,current,,
+Traffic,traffic,Traffic,current,,
+Traffic Signal Condition,traffic-signal-condition,Traffic Signal Condition,current,,
+Trans Fat,trans-fat,Trans Fat,current,,last used 2023-06
+Transfer Station Complaint,transfer-station-complaint,Transfer Station Complaint,current,,
+Trapping Pigeon,trapping-pigeon,Trapping Pigeon,current,,last used 2026-03
+Tunnel Condition,tunnel-condition,Tunnel Condition,current,,
+Unleashed Dog,unleashed-dog,Unleashed Dog,current,,
+Unlicensed Dog,unlicensed-dog,Unlicensed Dog,current,,last used 2023-11
+Unsanitary Animal Facility,unsanitary-animal-facility,Unsanitary Animal Facility,current,,
+Unsanitary Animal Pvt Property,unsanitary-animal-pvt-property,Unsanitary Animal Pvt Property,current,,
+UNSANITARY CONDITION,unsanitary-condition,UNSANITARY CONDITION,current,,
+Unsanitary Condition,unsanitary-condition,UNSANITARY CONDITION,spelling,,last used 2023-10
+Unsanitary Pigeon Condition,unsanitary-pigeon-condition,Unsanitary Pigeon Condition,current,,
+Unspecified,unspecified,Unspecified,current,,last used 2025-10
+Unstable Building,unstable-building,Unstable Building,current,,last used 2023-10
+Uprooted Stump,uprooted-stump,Uprooted Stump,current,,
+Urinating in Public,urinating-in-public,Urinating in Public,current,,
+Vaccine Mandate Non-Compliance,vaccine-mandate-non-compliance,Vaccine Mandate Non-Compliance,current,,last used 2022-09
+Vending,vending,Vending,current,,"ended Jan 2021; Vendor Enforcement only starts Mar 2023, so it isn't treated as a rename"
+Vendor Enforcement,vendor-enforcement,Vendor Enforcement,current,,
+Violation of Park Rules,violation-of-park-rules,Violation of Park Rules,current,,
+Waste Water Treatment Plant,waste-water-treatment-plant,Waste Water Treatment Plant,current,,
+Plant,waste-water-treatment-plant,Waste Water Treatment Plant,renamed,2026-08,DEP; plant odor and noise; handover Jul-Aug 2026
+Water Conservation,water-conservation,Water Conservation,current,,
+Water Drainage,water-drainage,Water Drainage,current,,last used 2023-10
+WATER LEAK,water-leak,WATER LEAK,current,,
+Water Leak,water-leak,WATER LEAK,spelling,,last used 2023-10
+Water Maintenance,water-maintenance,Water Maintenance,current,,
+Water System,water-maintenance,Water Maintenance,renamed,2026-08,DEP; handover Jul-Aug 2026
+Water Quality,water-quality,Water Quality,current,,
+Wayfinding,wayfinding,Wayfinding,current,,
+Window Guard,window-guard,Window Guard,current,,
+Wood Pile Remaining,wood-pile-remaining,Wood Pile Remaining,current,,
+X-Ray Machine/Equipment,x-ray-machine-equipment,X-Ray Machine/Equipment,current,,
+ZTESTINT,ztestint,ZTESTINT,current,,last used 2023-02

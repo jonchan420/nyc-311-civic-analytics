@@ -17,8 +17,10 @@ The other four boroughs get HEAT/HOT WATER 100 and Illegal Parking 50
 every month. The citywide file is the five-borough total plus 10
 complaints a month with no borough. metadata.json says the data is
 complete through Feb 2026; Mar 2026 is in the files as a partial month.
+category_catalog.csv is built from these tables with one reviewed
+rename, Sewer -> Sewer Maintenance.
 
-Run directly to inspect the files: python tests/fixtures/make_fixtures.py
+Run from the repo root to inspect the files: python -m tests.fixtures.make_fixtures
 """
 
 from __future__ import annotations
@@ -28,7 +30,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from analyst.catalog import CATALOG_FILE, build_catalog
+
 MONTHS = [f"2025-{month:02d}" for month in range(1, 13)] + ["2026-01", "2026-02", "2026-03"]
+RENAMES = {"Sewer": ("Sewer Maintenance", "fixture: Sewer stops as Sewer Maintenance starts")}
 COMPLETE_THROUGH = "2026-02"
 OTHER_BOROUGHS = ("BRONX", "BROOKLYN", "MANHATTAN", "STATEN ISLAND")
 NO_BOROUGH_PER_MONTH = 10
@@ -80,6 +85,7 @@ def write_fixtures(out_dir: Path) -> Path:
     category.to_parquet(out_dir / "monthly_borough_category.parquet", index=False)
     citywide.to_csv(out_dir / "monthly_citywide_counts.csv", index=False)
     (out_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    build_catalog(category, RENAMES).to_csv(out_dir / CATALOG_FILE, index=False)
     return out_dir
 
 
