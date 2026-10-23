@@ -380,6 +380,12 @@ def write_report() -> Path:
             met = "yes" if entry["met"] else "**no**"
             lines.append(f"| {metric} | {percent(entry['value'])} ({entry['passed']}/{entry['total']}) | "
                          f"{percent(entry['threshold'])} | {met} |")
+        # report-only, derived from the stored cases: did each run take the expected route at all?
+        # (an explain case answered with a tool can still pass source support, so this shows it)
+        runs = [(case["id"], run["kind"], case["expect"]["kind"]) for case in result["cases"] for run in case["runs"]]
+        wrong = sorted({f"{case_id} ({expected} -> {kind})" for case_id, kind, expected in runs if kind != expected})
+        lines += ["", f"Route accuracy (report only): {percent(sum(k == e for _, k, e in runs) / len(runs))}"
+                      + (f"; off route: {', '.join(wrong)}." if wrong else ".")]
         lines += ["", f"Questions placed by the rules without a model: {percent(extra['placed_by_rules'])}. "
                       f"Model calls per question: {extra['model_calls_per_question']:.2f}. "
                       f"Mean cost per question: ${extra['mean_usd_per_question']:.4f}. "
