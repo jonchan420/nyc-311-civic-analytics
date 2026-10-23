@@ -51,7 +51,7 @@ def test_citywide_trend_reports_complaints_without_a_borough(fixture_dir):
 
 
 def test_trend_refuses_a_partial_month(fixture_dir):
-    with pytest.raises(DataUnavailableError, match="complete only through 2026-02"):
+    with pytest.raises(DataUnavailableError, match="complete only through Feb 2026"):
         monthly_trend({"geography": "QUEENS", "period": {"start": "2026-01", "end": "2026-03"}},
                       data_dir=fixture_dir)
 
@@ -131,5 +131,5 @@ def test_citywide_month_summary(fixture_dir):
 
 
 def test_month_summary_refuses_a_partial_month(fixture_dir):
-    with pytest.raises(DataUnavailableError, match="complete only through 2026-02"):
+    with pytest.raises(DataUnavailableError, match="complete only through Feb 2026"):
         month_summary({"geography": "QUEENS", "month": "2026-03"}, data_dir=fixture_dir)

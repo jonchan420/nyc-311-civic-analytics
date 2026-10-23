@@ -150,14 +150,14 @@ def test_category_text_never_reaches_sql(fixture_dir):
 
 
 def test_partial_month_is_refused(fixture_dir):
-    with pytest.raises(DataUnavailableError, match="complete only through 2026-02"):
+    with pytest.raises(DataUnavailableError, match="complete only through Feb 2026"):
         compare_periods({"geography": "QUEENS",
                          "period_a": {"start": "2025-02", "end": "2025-03"},
                          "period_b": {"start": "2026-02", "end": "2026-03"}}, data_dir=fixture_dir)
 
 
 def test_months_before_the_data_are_refused(fixture_dir):
-    with pytest.raises(DataUnavailableError, match="the data begins 2025-01"):
+    with pytest.raises(DataUnavailableError, match="the data begins in Jan 2025"):
         compare_periods({"geography": "QUEENS",
                          "period_a": {"start": "2024-12", "end": "2025-01"},
                          "period_b": {"start": "2025-12", "end": "2026-01"}}, data_dir=fixture_dir)
@@ -169,9 +169,9 @@ def test_a_missing_month_is_a_gap_not_zero(tmp_path):
     table = pd.read_parquet(path)
     gap = (table["borough"] == "QUEENS") & (table["month"] == "2025-02-01")
     table[~gap].to_parquet(path, index=False)
-    with pytest.raises(DataUnavailableError, match="QUEENS 2025-02"):
+    with pytest.raises(DataUnavailableError, match="Queens in Feb 2025"):
         run(data_dir)
-    with pytest.raises(DataUnavailableError, match="QUEENS 2025-02"):
+    with pytest.raises(DataUnavailableError, match="Queens in Feb 2025"):
         compare_periods({"geography": "CITYWIDE", **WINTER}, data_dir=data_dir)
 
 

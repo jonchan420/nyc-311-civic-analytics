@@ -26,6 +26,9 @@ CITYWIDE_FILE = "monthly_citywide_counts.csv"
 METADATA_FILE = "metadata.json"
 REQUIRED_COLUMNS = {"month", "borough", "complaint_type", "complaint_count"}
 UNIT = "recorded 311 service requests (a measure of reporting, not of underlying conditions)"
+# how the periods tools pass to require_months read in an error message
+PERIOD_NAMES = {"period_a": "The first period", "period_b": "The second period", "period": "The period",
+                "month": "The month", "prior": "The month before", "last_year": "The same month a year before"}
 
 
 class ToolError(Exception):
@@ -154,18 +157,20 @@ class DataSource:
         """Refuse months outside the complete data, and whole months with no rows at all.
         periods maps the name used in error messages ("period_a", "month") to its months."""
         for name, period in periods.items():
+            label = PERIOD_NAMES.get(name, name)
             if period.start < self.first_month:
                 raise DataUnavailableError(
-                    f"{name} starts {period.start}, but the data begins {self.first_month}.")
+                    f"{label} starts in {month_name(period.start)}, but the data begins in "
+                    f"{month_name(self.first_month)}.")
             if period.end > self.usable_through:
                 raise DataUnavailableError(
-                    f"{name} ends {period.end}, but the data is complete only through "
-                    f"{self.usable_through}; later months are missing or still partial.")
+                    f"{label} ends in {month_name(period.end)}, but the data is complete only through "
+                    f"{month_name(self.usable_through)}; later months are missing or still partial.")
         present = set(self.con.execute(
             "SELECT DISTINCT borough, strftime(month, '%Y-%m') FROM borough_category "
             "WHERE list_contains($boroughs, borough)", {"boroughs": boroughs}).fetchall())
         months = sorted({month for period in periods.values() for month in period.each_month()})
-        gaps = [f"{borough} {month}" for borough in boroughs for month in months
+        gaps = [f"{borough.title()} in {month_name(month)}" for borough in boroughs for month in months
                 if (borough, month) not in present]
         if gaps:
             more = " and others" if len(gaps) > 5 else ""

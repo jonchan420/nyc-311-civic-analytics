@@ -74,9 +74,17 @@ DECLINES = [
      "Agency performance isn't something these complaint counts can measure."),
 ]
 VAGUE_TIME = r"\b(recently|lately|these days|nowadays)\b"
+# words that show a question is about the complaint data, when no place, period, or type is named
+DATA_WORDS = (r"\b(complaints?|requests?|311|calls?|reports?|reported|reporting|filed|counts?|numbers?|totals?|"
+              r"trends?|changes?|changed|chang\w*|rise|rose|risen|rising|increase\w*|decrease\w*|drop\w*|fell|"
+              r"fall(en|ing)|grew|grow\w*|compar\w*|vs|versus|brief\w*|summar\w*|overview|recap|happen\w*|"
+              r"busiest|quietest|peak|common|top|charts?|graphs?|monthly|data)\b")
+OFF_TOPIC = ("I can only answer questions about recorded NYC 311 complaints: how many were filed, where "
+             "(by borough or citywide), when, and of which type. That question isn't about them.")
 EXPLAIN = (r"^(what|which|how|why|where|when|is|are|does|do|can)\b.*\b(mean|means|meaning|defin|calculat|computed|"
            r"scor|wape|come from|source|methodolog|limit|caveat|flag|renam|catalog|per[- ]capita|partial|"
-           r"unusual|spike|missing|accurate|accuracy|reliable|trust|count as|reporting bias|interpret)")
+           r"unusual|spike|missing|accurate|accuracy|reliable|trust|count as|reporting bias|interpret|"
+           r"add up|differ)|^why (do|does|is|are|did)(n'?t| not)\b")
 
 
 @dataclass
@@ -124,6 +132,7 @@ class Period:
     end: str
     label: str
     position: int
+    endpoints: bool = False                    # written as "<month> to <month>"
 
     @property
     def months(self) -> int:
@@ -182,6 +191,9 @@ def route(question: str, context: RouterContext) -> Route:
             suggestions = difflib.get_close_matches(unknown, context.categories, n=4, cutoff=0.5)
             return Route("model", message=f'No complaint type called "{unknown}" was found.',
                          options=suggestions)
+    named_place = geography != "CITYWIDE" or re.search(CITYWIDE_WORDS, text)
+    if not (named_place or periods or categories or re.search(DATA_WORDS, text)):
+        return Route("decline", message=OFF_TOPIC)
     assumptions += category_notes
     if place.assumptions:
         assumptions = place.assumptions + assumptions
@@ -197,6 +209,12 @@ def route(question: str, context: RouterContext) -> Route:
 
     if briefing:
         return _summary_route(geography, periods, assumptions, context)
+    if compare and not trend and len(periods) == 1 and periods[0].endpoints:
+        whole = periods[0]  # "how did X change from June 2025 to June 2026" compares the two months
+        periods = [Period(whole.start, whole.start, month_name(whole.start), whole.position),
+                   Period(whole.end, whole.end, month_name(whole.end), whole.position + 1)]
+        assumptions.append(f"This compares {month_name(whole.start)} with {month_name(whole.end)}, "
+                           "not the months in between.")
     if len(periods) >= 2:
         return _compare_route(geography, periods, categories, assumptions, context)
     if trend:
@@ -251,12 +269,13 @@ def _find_periods(text: str, context: RouterContext) -> tuple[list[Period], list
     taken: list[tuple[int, int]] = []
     assumptions: list[str] = []
 
-    def add(match: re.Match, start: str, end: str, label: str, note: str | None = None) -> None:
+    def add(match: re.Match, start: str, end: str, label: str, note: str | None = None,
+            endpoints: bool = False) -> None:
         span = match.span()
         if any(span[0] < b and a < span[1] for a, b in taken):
             return
         taken.append(span)
-        found.append(Period(start, end, label, span[0]))
+        found.append(Period(start, end, label, span[0], endpoints))
         if note:
             assumptions.append(note)
 
@@ -264,10 +283,12 @@ def _find_periods(text: str, context: RouterContext) -> tuple[list[Period], list
         return f"{year:04d}-{month:02d}"
 
     for m in re.finditer(rf"\b{MON}\s+(\d{{4}})\s*(?:to|through|thru|until|-|–)\s*{MON}\s+(\d{{4}})\b", text):
-        add(m, ym(int(m[2]), MONTHS[m[1]]), ym(int(m[4]), MONTHS[m[3]]), m[0])
+        start, end = ym(int(m[2]), MONTHS[m[1]]), ym(int(m[4]), MONTHS[m[3]])
+        add(m, start, end, f"{month_name(start)} to {month_name(end)}", endpoints=True)
     for m in re.finditer(rf"\b{MON}\s*(?:to|through|thru|until|-|–)\s*{MON}\s+(\d{{4}})\b", text):
         first, last, year = MONTHS[m[1]], MONTHS[m[2]], int(m[3])
-        add(m, ym(year - 1 if first > last else year, first), ym(year, last), m[0])
+        start, end = ym(year - 1 if first > last else year, first), ym(year, last)
+        add(m, start, end, f"{month_name(start)} to {month_name(end)}", endpoints=True)
     for m in re.finditer(r"\b(spring|summer|fall|autumn|winter)\s+(?:of\s+)?(\d{4})\b", text):
         first, last = SEASONS[m[1]]
         year = int(m[2])
@@ -277,15 +298,15 @@ def _find_periods(text: str, context: RouterContext) -> tuple[list[Period], list
     for m in re.finditer(r"\bq([1-4])\s*(?:of\s+)?(\d{4})\b|\b(first|second|third|fourth) quarter (?:of )?(\d{4})\b", text):
         quarter = int(m[1]) if m[1] else ORDINALS[m[3]]
         year = int(m[2] or m[4])
-        add(m, ym(year, 3 * quarter - 2), ym(year, 3 * quarter), m[0])
+        add(m, ym(year, 3 * quarter - 2), ym(year, 3 * quarter), f"Q{quarter} {year}")
     for m in re.finditer(r"\b(first|second) half (?:of )?(\d{4})\b", text):
         half = ORDINALS[m[1]]
-        add(m, ym(int(m[2]), 6 * half - 5), ym(int(m[2]), 6 * half), m[0])
+        add(m, ym(int(m[2]), 6 * half - 5), ym(int(m[2]), 6 * half), f"the {m[1]} half of {m[2]}")
     for m in re.finditer(rf"\b{MON}\s+(\d{{4}})\b", text):
         month = ym(int(m[2]), MONTHS[m[1]])
-        add(m, month, month, m[0])
+        add(m, month, month, month_name(month))
     for m in re.finditer(r"\b(\d{4})-(0[1-9]|1[0-2])\b", text):
-        add(m, m[0], m[0], m[0])
+        add(m, m[0], m[0], month_name(m[0]))
     latest = context.complete_through
     for m in re.finditer(r"\b(?:last|past|previous) (\d{1,2}) months\b", text):
         n = int(m[1])
@@ -327,6 +348,10 @@ def _find_periods(text: str, context: RouterContext) -> tuple[list[Period], list
             add(m, f"{m[1]}-01", f"{m[1]}-12", m[1])
     found.sort(key=lambda p: (p.start, p.position))
     return found, assumptions
+
+
+def _capitalized(label: str) -> str:
+    return label[:1].upper() + label[1:]
 
 
 def _period_suggestions(context: RouterContext) -> list[str]:
@@ -395,18 +420,25 @@ months season quarter people residents filed made did does do is are was were th
 rise rising increase decrease change changes trend trends compare comparison show tell give me us
 have has had been being gone go going went get got be will would could should can may might why when where
 who whom whose so as at on to by from than then also just only even still up down out over any
+recorded reported monthly yearly annual seasonal weekly daily average typical usual unusual share percent
+percentage rate rates count counts volume level levels pattern patterns history historical latest current
+previous same similar
 """.split())
 
 
 def _unrecognized_topic(text: str) -> str | None:
-    """The topic in "<topic> complaints" when it isn't a place, a time, or a generic word."""
-    match = re.search(r"\b([a-z][a-z' -]{1,40}?)\s+(complaints|requests|calls|reports|issues|problems)\b", text)
-    if not match:
-        return None
+    """The topic in "<topic> complaints": the words just before the noun, back to the
+    first place, time, number, or generic word ("bike lane" in "how did bike lane complaints")."""
     place_and_time = set(BOROUGHS) | set(MONTHS) | set(SEASONS) | {"bronx", "staten", "island"}
-    words = [w for w in re.findall(r"[a-z']+", match[1])
-             if w not in GENERIC_WORDS and w not in place_and_time and not w.isdigit()]
-    return " ".join(words) or None
+    for match in re.finditer(r"\b(complaints?|requests?|calls|reports|issues|problems)\b", text):
+        topic: list[str] = []
+        for word in reversed(re.findall(r"[a-z']+|\d+", text[:match.start()])):
+            if word in GENERIC_WORDS or word in place_and_time or word.isdigit():
+                break
+            topic.insert(0, word)
+        if topic:
+            return " ".join(topic[-3:])
+    return None
 
 
 # ------------------------------------------------------------------ routes
@@ -419,7 +451,7 @@ def _compare_route(geography: str, periods: list[Period], categories: list[str],
     if len(periods) == 1:
         later = periods[0]
         periods = [later.shifted(-12, f"the same months a year earlier"), later]
-        assumptions.append(f"{later.label.title()} is compared with the same months a year earlier.")
+        assumptions.append(f"{_capitalized(later.label)} is compared with the same months a year earlier.")
     if not periods:
         latest = context.complete_through
         periods = [Period(shift_month(latest, -12), shift_month(latest, -12), "a year earlier", 0),
