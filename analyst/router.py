@@ -34,7 +34,7 @@ NEIGHBORHOOD_FILE = DATA_DIR / "equity" / "results" / "neighborhood_reporting_ga
 
 # Category names that are also everyday words; they only match through ALIASES.
 AMBIGUOUS_NAMES = {"GENERAL", "SAFETY", "LEAD", "DRINKING", "STORM", "UNSPECIFIED", "BENCH", "NOISE",
-                   "SNW", "SRDE", "SRGOVG", "ZTESTINT"}
+                   "SNW", "SRDE", "SRGOVG", "ZTESTINT", "PLANT"}
 # Everyday words for categories: pattern -> category names (several = all of them)
 ALIASES: dict[str, list[str]] = {
     r"\b(no )?heat\b|\bhot water\b": ["HEAT/HOT WATER"],
@@ -53,7 +53,18 @@ FAMILIES = {"noise": "NOISE", "trees?": "TREE"}  # a family word means every cat
 UNCLEAR_WORDS = {r"\b(trash|garbage|litter)\b": ["Dirty Condition", "Missed Collection", "Illegal Dumping",
                                                  "Litter Basket Complaint"]}
 
+OFF_TOPIC = ("I can only answer questions about recorded NYC 311 complaints: how many were filed, where "
+             "(by borough or citywide), when, and of which type. That question isn't about them.")
+# a sentence that tries to change the rules is dropped before routing; only those sentences
+INJECTION = (r"\b(ignore|disregard|forget|override)\b[^.?!;]{0,60}\b(rules?|instructions?|prompts?|guidelines?|"
+             r"previous|above|everything)\b|\byou are now\b|\bdeveloper mode\b|\bjailbreak\b|\bsystem prompt\b"
+             r"|\b(reveal|print|show|tell me|give me|output)\b[^.?!;]{0,40}\b(api ?keys?|secrets?|passwords?|tokens?)\b")
+INJECTION_REPLY = ("I can't change how I work, follow instructions written into a question, or share settings or "
+                   "keys. I can answer questions about recorded NYC 311 complaints.")
+INJECTION_NOTE = "Part of the question asked me to change how I work; that part was ignored."
 DECLINES = [
+    (r"\b(write|compose|create|generate|draft)\b[^.?!]*\b(poems?|story|stories|songs?|jokes?|essays?|haikus?|"
+     r"limericks?|raps?|lyrics)\b", OFF_TOPIC),
     (r"\b(select|insert|update|delete|drop)\b.+\b(from|into|table|where)\b|\bsql\b",
      "I can't run SQL or code someone supplies. Ask the question in words and I'll pick one of the "
      "checked calculations."),
@@ -74,13 +85,12 @@ DECLINES = [
      "Agency performance isn't something these complaint counts can measure."),
 ]
 VAGUE_TIME = r"\b(recently|lately|these days|nowadays)\b"
+DEFINITION = r"\b(mean|means|meaning|defined|definition|count as|counts as|counted as|calculated|computed)\b"
 # words that show a question is about the complaint data, when no place, period, or type is named
 DATA_WORDS = (r"\b(complaints?|requests?|311|calls?|reports?|reported|reporting|filed|counts?|numbers?|totals?|"
               r"trends?|changes?|changed|chang\w*|rise|rose|risen|rising|increase\w*|decrease\w*|drop\w*|fell|"
               r"fall(en|ing)|grew|grow\w*|compar\w*|vs|versus|brief\w*|summar\w*|overview|recap|happen\w*|"
               r"busiest|quietest|peak|common|top|charts?|graphs?|monthly|data)\b")
-OFF_TOPIC = ("I can only answer questions about recorded NYC 311 complaints: how many were filed, where "
-             "(by borough or citywide), when, and of which type. That question isn't about them.")
 EXPLAIN = (r"^(what|which|how|why|where|when|is|are|does|do|can)\b.*\b(mean|means|meaning|defin|calculat|computed|"
            r"scor|wape|come from|source|methodolog|limit|caveat|flag|renam|catalog|per[- ]capita|partial|"
            r"unusual|spike|missing|accurate|accuracy|reliable|trust|count as|reporting bias|interpret|"
@@ -93,13 +103,15 @@ class RouterContext:
     first_month: str
     categories: list[str]
     neighborhoods: dict[str, set[str]]
+    renamed: dict[str, str] = field(default_factory=dict)   # old label -> current category name
 
     @classmethod
     def load(cls, data_dir: Path = LIVE_DIR, neighborhood_file: Path = NEIGHBORHOOD_FILE) -> RouterContext:
         with DataSource(data_dir) as source:
             categories = source.catalog.names()
+            renamed = source.catalog.renamed_labels()
             complete_through, first_month = source.complete_through, source.first_month
-        return cls(complete_through, first_month, categories, load_neighborhoods(neighborhood_file))
+        return cls(complete_through, first_month, categories, load_neighborhoods(neighborhood_file), renamed)
 
 
 def load_neighborhoods(path: Path = NEIGHBORHOOD_FILE) -> dict[str, set[str]]:
@@ -147,6 +159,14 @@ class Period:
 
 
 def route(question: str, context: RouterContext) -> Route:
+    sentences = [s for s in re.split(r"(?<=[.!?;:])\s+", question.strip()) if s]
+    kept = [s for s in sentences if not re.search(INJECTION, s.lower())]
+    if len(kept) < len(sentences):
+        if not any(re.search(r"[a-z]{3}", s.lower()) for s in kept):
+            return Route("decline", message=INJECTION_REPLY)
+        plan = route(" ".join(kept), context)
+        plan.assumptions.insert(0, INJECTION_NOTE)
+        return plan
     text = " ".join(question.lower().split())
     for pattern, reason in DECLINES:
         if re.search(pattern, text):
@@ -165,7 +185,7 @@ def route(question: str, context: RouterContext) -> Route:
         return Route("tool", "forecast_status", {}, assumptions=assumptions)
 
     periods, assumptions = _find_periods(text, context)
-    if re.search(EXPLAIN, text) and not periods:
+    if re.search(EXPLAIN, text) and (not periods or re.search(DEFINITION, text)):
         return Route("explain", message="method question")
 
     if re.search(r"\b(this|current) month\b|\btoday\b|\bthis week\b", text):
@@ -181,7 +201,7 @@ def route(question: str, context: RouterContext) -> Route:
         if period.start < context.first_month:
             return Route("decline", message=f"The data begins in {month_name(context.first_month)}.")
 
-    categories, category_notes, unclear = _find_categories(text, context.categories)
+    categories, category_notes, unclear = _find_categories(text, context.categories, context.renamed)
     if unclear:
         return Route("clarify", message=f'"{unclear[0]}" could mean several complaint types. Which one?',
                      options=unclear[1])
@@ -192,6 +212,10 @@ def route(question: str, context: RouterContext) -> Route:
             return Route("model", message=f'No complaint type called "{unknown}" was found.',
                          options=suggestions)
     named_place = geography != "CITYWIDE" or re.search(CITYWIDE_WORDS, text)
+    if text.startswith("why"):
+        if not (named_place or periods or categories):  # counts can't say why; the notes explain what they can
+            return Route("explain", message="why question")
+        assumptions.append("The counts show what changed, not why it changed.")
     if not (named_place or periods or categories or re.search(DATA_WORDS, text)):
         return Route("decline", message=OFF_TOPIC)
     assumptions += category_notes
@@ -302,12 +326,15 @@ def _find_periods(text: str, context: RouterContext) -> tuple[list[Period], list
     for m in re.finditer(r"\b(first|second) half (?:of )?(\d{4})\b", text):
         half = ORDINALS[m[1]]
         add(m, ym(int(m[2]), 6 * half - 5), ym(int(m[2]), 6 * half), f"the {m[1]} half of {m[2]}")
+    latest = context.complete_through
+    for m in re.finditer(r"\bsince\s+(?:(" + MON[1:-4] + r")\s+)?(\d{4})\b", text):
+        start = ym(int(m[2]), MONTHS[m[1]] if m[1] else 1)
+        add(m, start, latest, m[0], f"Since {month_name(start)} means through {month_name(latest)}, the latest complete month.")
     for m in re.finditer(rf"\b{MON}\s+(\d{{4}})\b", text):
         month = ym(int(m[2]), MONTHS[m[1]])
         add(m, month, month, month_name(month))
     for m in re.finditer(r"\b(\d{4})-(0[1-9]|1[0-2])\b", text):
         add(m, m[0], m[0], month_name(m[0]))
-    latest = context.complete_through
     for m in re.finditer(r"\b(?:last|past|previous) (\d{1,2}) months\b", text):
         n = int(m[1])
         add(m, shift_month(latest, -(n - 1)), latest, m[0],
@@ -337,9 +364,6 @@ def _find_periods(text: str, context: RouterContext) -> tuple[list[Period], list
             this_year = found[-1]
             last = this_year.shifted(-12, "the same months last year")
             found.append(Period(last.start, last.end, last.label, this_year.position + 1))
-    for m in re.finditer(r"\bsince\s+(?:(" + MON[1:-4] + r")\s+)?(\d{4})\b", text):
-        start = ym(int(m[2]), MONTHS[m[1]] if m[1] else 1)
-        add(m, start, latest, m[0], f"Since {month_name(start)} means through {month_name(latest)}, the latest complete month.")
     for m in re.finditer(r"\b(20[12]\d)\b", text):
         if m[1] == latest[:4] and latest[5:] != "12":  # the current year isn't over yet
             add(m, f"{m[1]}-01", latest, f"{m[1]} so far",
@@ -347,7 +371,11 @@ def _find_periods(text: str, context: RouterContext) -> tuple[list[Period], list
         else:
             add(m, f"{m[1]}-01", f"{m[1]}-12", m[1])
     found.sort(key=lambda p: (p.start, p.position))
-    return found, assumptions
+    unique: list[Period] = []
+    for period in found:
+        if not any((p.start, p.end) == (period.start, period.end) for p in unique):
+            unique.append(period)
+    return unique, list(dict.fromkeys(assumptions))
 
 
 def _capitalized(label: str) -> str:
@@ -370,46 +398,64 @@ def _loose_key(text: str) -> str:
                     for w in spelling_key(text).split())
 
 
-def _find_categories(text: str, names: list[str]) -> tuple[list[str], list[str], tuple[str, list[str]] | None]:
-    """(category names, notes, unclear (word, options) or None).
+def _find_categories(text: str, names: list[str], renamed: dict[str, str] | None = None
+                     ) -> tuple[list[str], list[str], tuple[str, list[str]] | None]:
+    """(category names in the order the question names them, notes, unclear (word, options) or None).
 
-    Multi-word names match first, then everyday aliases, then one-word names,
-    so "traffic noise" is read as vehicle noise, not the "Traffic" category.
+    Multi-word names and old labels match first, then everyday aliases, then
+    one-word names, so "traffic noise" is read as vehicle noise, not the
+    "Traffic" category. Matched words are blanked out (keeping their length)
+    so a later step can't match them again and positions stay comparable.
     """
-    found: list[str] = []
+    hits: list[tuple[int, str]] = []
     notes: list[str] = []
     padded = f" {_loose_key(text)} "
-    by_key = {_loose_key(name): name for name in names if spelling_key(name) not in AMBIGUOUS_NAMES}
+    current = {_loose_key(name): name for name in names if spelling_key(name) not in AMBIGUOUS_NAMES}
+    old = {_loose_key(label): name for label, name in (renamed or {}).items()
+           if name in names and spelling_key(label) not in AMBIGUOUS_NAMES and _loose_key(label) not in current}
+    old_spelling = {_loose_key(label): label for label in (renamed or {})}
 
-    def match_names(multi_word: bool) -> None:
+    def take(start: int, end: int, name: str) -> None:
         nonlocal padded
-        for key in sorted(by_key, key=len, reverse=True):
-            if (" " in key) == multi_word and f" {key} " in padded and by_key[key] not in found:
-                found.append(by_key[key])
-                padded = padded.replace(f" {key} ", " ")
+        padded = padded[:start] + " " * (end - start) + padded[end:]
+        if name not in (n for _, n in hits):
+            hits.append((start, name))
 
-    match_names(multi_word=True)
-    remaining = padded.lower()
+    def match(keys: dict[str, str], multi_word: bool, was_renamed: bool = False) -> None:
+        for key in sorted(keys, key=len, reverse=True):
+            if (" " in key) != multi_word:
+                continue
+            for found in re.finditer(rf"(?<= ){re.escape(key)}(?= )", padded):
+                take(found.start(), found.end(), keys[key])
+                if was_renamed:
+                    note = f'"{old_spelling[key]}" complaints are now recorded as "{keys[key]}"; both are counted.'
+                    if note not in notes:
+                        notes.append(note)
+
+    match(current, multi_word=True)
+    match(old, multi_word=True, was_renamed=True)
     for pattern, targets in ALIASES.items():
-        if re.search(pattern, remaining):
-            found += [t for t in targets if t in names and t not in found]
-            remaining = re.sub(pattern, " ", remaining)
-            if pattern == r"\bpotholes?\b":
+        for found in re.finditer(pattern, padded.lower()):
+            for target in targets:
+                if target in names:
+                    take(found.start(), found.end(), target)
+            if pattern == r"\bpotholes?\b" and "Potholes are recorded under Street Condition." not in notes:
                 notes.append("Potholes are recorded under Street Condition.")
-    padded = f" {remaining.upper()} "
-    match_names(multi_word=False)
-    remaining = padded.lower()
+    match(current, multi_word=False)
+    match(old, multi_word=False, was_renamed=True)
     for word, family in FAMILIES.items():
-        if re.search(rf"\b{word}\b", remaining):
+        found = re.search(rf"\b{word}\b", padded.lower())
+        if found:
             members = [n for n in names if re.search(rf"\b{family}\b", spelling_key(n))]
-            found += [n for n in members if n not in found]
+            for member in members:
+                take(found.start(), found.end(), member)
             notes.append(f'"{family.lower()}" includes every {family.lower()} category: {", ".join(members)}.')
-    if not found:
+    if not hits:
         for pattern, options in UNCLEAR_WORDS.items():
-            match = re.search(pattern, remaining)
-            if match:
-                return [], [], (match[0], [o for o in options if o in names])
-    return found, notes, None
+            found = re.search(pattern, padded.lower())
+            if found:
+                return [], [], (found[0], [o for o in options if o in names])
+    return [name for _, name in sorted(hits, key=lambda hit: hit[0])], notes, None
 
 
 GENERIC_WORDS = set("""the a an all total overall 311 service many how which what more fewer most number of in for

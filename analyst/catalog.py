@@ -105,6 +105,10 @@ class CategoryCatalog:
     def names(self) -> list[str]:
         return sorted({entry.category for entry in self._by_label.values()})
 
+    def renamed_labels(self) -> dict[str, str]:
+        """Old label -> the current category name it is now counted under."""
+        return {entry.label: entry.category for entry in self._by_label.values() if entry.kind == "renamed"}
+
     def suggest(self, text: str, n: int = 3) -> list[str]:
         return difflib.get_close_matches(text, self.names(), n=n, cutoff=0.6)
 
