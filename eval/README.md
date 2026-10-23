@@ -11,7 +11,7 @@ generated from the files in `results/`.
 | numerical_accuracy | The expected tool, run with the expected parameters, matches the independent pandas oracle in `tests/fixtures/oracle.py` and any numbers worked out by hand (counts exact, other numbers within 0.05) | 100% |
 | tool_selection | Questions that should be answered with a tool ran that tool | 90% |
 | parameters | ...and with exactly the expected parameters | 90% |
-| grounding | Every number in an answer appears in the tool result (or, for method answers, in the notes) | 100% |
+| grounding | Every number in the answer shown appears in the tool result (or, for method answers, in the notes). When a model's draft fails the check, the app shows the template instead; the report counts those replaced drafts separately. | 100% |
 | source_support | The expected method note is among the top 3 retrieved | 85% |
 | clarification_asks / _restraint | Asks a question back when it should, and doesn't when it shouldn't | 85% each |
 | incomplete_data | Months after the data are declined, naming the last complete month | 100% |
@@ -29,7 +29,7 @@ tested nothing.
 
 ## Case sets
 
-- `dev_cases.jsonl`: 30 cases used while building and fixing the router.
+- `dev_cases.jsonl`: 32 cases used while building and fixing the router and the model prompts.
 - `heldout_cases.jsonl`: 30 cases kept for the final run. The file's SHA-256 is committed in
   `heldout_cases.sha256`, and the runner refuses a file that doesn't match it. The same person
   wrote the router and these cases, so the held-out set is not a blind test. Its purpose is to
@@ -44,6 +44,16 @@ python eval/run_eval.py --cases heldout          # the final run on the sealed c
 python eval/run_eval.py --report                 # rebuild RESULTS.md from results/
 ```
 
+A free local model runs through [Ollama](https://ollama.com). Install it, start it, and download the
+model once (about 5 GB):
+
+```bash
+brew install ollama && ollama serve        # leave this running in its own terminal
+ollama pull qwen3:8b
+python eval/run_eval.py --mode ollama                    # the rules route; the model writes the answers
+python eval/run_eval.py --mode ollama --routing model    # the model routes every question too
+```
+
 Running against Claude makes real API calls. It needs `ANTHROPIC_API_KEY` and `--confirm-spend`,
 and it stops calling the API at `--max-calls` (default 150) or `--max-usd` (default $5):
 
@@ -53,4 +63,6 @@ python eval/run_eval.py --mode claude --cases heldout --repeats 5 --confirm-spen
 
 Each run writes `results/<date>_<cases>_<model>_<commit>.json`. A `-dirty` suffix means the
 code had uncommitted changes. A failed threshold stays in the results with its cause. Runs
-aren't deleted or repeated until they pass.
+aren't deleted or repeated until they pass. One set of local-model runs was repeated, unchanged,
+because the grounding metric had scored the model's rejected draft instead of the answer shown;
+both sets are kept.

@@ -184,6 +184,10 @@ python eval/run_eval.py                # development questions, rules only; writ
 python analyst/mcp_server.py           # the tools as an MCP server over stdio
 ```
 
+To test with a free local model instead of Claude, install [Ollama](https://ollama.com)
+(`brew install ollama`), run `ollama serve` and `ollama pull qwen3:8b`, then
+`python eval/run_eval.py --mode ollama`. See [eval/README.md](eval/README.md).
+
 To turn on Claude in the Ask 311 page, copy `.streamlit/secrets.toml.example`
 to `.streamlit/secrets.toml` and fill in the key, a passcode, and the daily
 limits. Without it, the page runs offline.
@@ -702,8 +706,35 @@ stands as measured, because re-running sealed questions after fixing them
 would no longer test anything. Every run, including the first development
 run that missed five targets, is in [eval/RESULTS.md](eval/RESULTS.md).
 
-These results are for the offline mode. Claude mode hasn't been run
-against these questions yet, because that run makes paid API calls.
+**With a free local model.** I also ran the held-out questions through
+Qwen3 8B, an open model running on my laptop through Ollama, so it costs
+nothing and no data leaves the machine. When the rules route each question
+and the model only writes the answer, every target was met. The number
+check replaced 4 of the model's 17 answers with the template. When the
+model routes every question itself (5 runs each):
+
+| Check | Qwen3 8B routing | Target |
+|---|---|---|
+| Picked the right tool | 100% (70/70) | 90% |
+| ...with exactly the right parameters | 57% (40/70), missed | 90% |
+| Every number shown traced to the tool result | 100% (90/90) | 100% |
+| Declined out-of-scope questions | 0% (0/30), missed | 95% |
+| Asked back when it should | 40% (10/25), missed | 85% |
+| Didn't ask back when it shouldn't | 76% (95/125), missed | 85% |
+| Ignored injected instructions | 100% (10/10) | 100% |
+| Gave the same answer every run | 100% (30/30) | 90% |
+
+The model was good at picking a tool, and the number check kept every
+unsupported figure out of its answers (14 of its 90 answers were replaced).
+It never declined an out-of-scope question, though: it wrote its refusals as
+plain text instead of calling the decline tool. Fixes tested afterwards on
+the development questions raised its declines to 83%, but it still missed
+several targets. That's why the rules make those calls and the model only
+handles what they can't place. A question took a median 7.6 seconds with
+the rules routing and 10.0 with the model routing, on an M5 Mac with 16 GB.
+
+Claude mode hasn't been run against these questions yet, because that run
+makes paid API calls.
 
 ## Data responsibility
 
@@ -777,10 +808,10 @@ problems, crime, or infrastructure failure.
 ## Future work
 
 **Measure Ask 311 with Claude turned on.** So far the evaluation covers
-the offline mode. The next run sends the same questions through Claude, 5
-times each, and records cost, speed, and how often the grounding check had
-to replace the model's answer. It also needs a fresh set of held-out
-questions, because the first set has now been used.
+the offline mode and a free local model. The next run sends the same
+questions through Claude, 5 times each, and records cost, speed, and how
+often the grounding check had to replace the model's answer. It also needs
+a fresh set of held-out questions, because the first set has now been used.
 
 **A stronger test of under-reporting.** The reporting-gap analysis
 compares complaints with what the Census says about housing, which
