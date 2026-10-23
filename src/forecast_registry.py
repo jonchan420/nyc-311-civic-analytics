@@ -22,15 +22,16 @@ from config.settings import FORECAST_DIR
 SUPERSEDED_FILE = FORECAST_DIR / "superseded.csv"
 
 
-def load_superseded() -> pd.DataFrame:
-    if not SUPERSEDED_FILE.exists():
+def load_superseded(forecast_dir: Path = FORECAST_DIR) -> pd.DataFrame:
+    path = forecast_dir / SUPERSEDED_FILE.name
+    if not path.exists():
         return pd.DataFrame(columns=["source_file", "reason"])
-    return pd.read_csv(SUPERSEDED_FILE)
+    return pd.read_csv(path)
 
 
-def load_forecasts() -> pd.DataFrame:
+def load_forecasts(forecast_dir: Path = FORECAST_DIR) -> pd.DataFrame:
     frames = []
-    for path in sorted(FORECAST_DIR.glob("forecast_*.csv")):
+    for path in sorted(forecast_dir.glob("forecast_*.csv")):
         df = pd.read_csv(path, parse_dates=["month"])
         df["source_file"] = path.name
         frames.append(df)
@@ -42,7 +43,7 @@ def load_forecasts() -> pd.DataFrame:
         forecasts["forecast_created_at"], format="ISO8601")
     forecasts["training_end_month"] = pd.to_datetime(
         forecasts["training_end_month"], format="%Y-%m")
-    superseded = load_superseded()
+    superseded = load_superseded(forecast_dir)
     forecasts = forecasts.merge(superseded, on="source_file", how="left")
     forecasts["superseded"] = forecasts["reason"].notna()
     return forecasts

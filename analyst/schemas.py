@@ -11,9 +11,17 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, model_validator
 
-Geography = Literal["CITYWIDE", "BRONX", "BROOKLYN", "MANHATTAN", "QUEENS", "STATEN ISLAND"]
+
+def _uppercase(value: Any) -> Any:
+    return value.strip().upper() if isinstance(value, str) else value
+
+
+Geography = Annotated[
+    Literal["CITYWIDE", "BRONX", "BROOKLYN", "MANHATTAN", "QUEENS", "STATEN ISLAND"],
+    BeforeValidator(_uppercase),
+]
 YearMonth = Annotated[str, StringConstraints(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")]
 CategoryName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
@@ -64,11 +72,6 @@ class ComparePeriodsParams(BaseModel):
     )
     top_n: int = Field(default=10, ge=1, le=25, description="How many categories to return")
 
-    @field_validator("geography", mode="before")
-    @classmethod
-    def _uppercase_geography(cls, value: Any) -> Any:
-        return value.strip().upper() if isinstance(value, str) else value
-
     @model_validator(mode="after")
     def _comparable_periods(self) -> ComparePeriodsParams:
         if self.period_a.end >= self.period_b.start:
@@ -79,6 +82,77 @@ class ComparePeriodsParams(BaseModel):
                 f"months, period_b has {self.period_b.months})"
             )
         return self
+
+
+class MonthlyTrendParams(BaseModel):
+    """Monthly complaint counts over a period, for all complaints or a few complaint types."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    geography: Geography
+    period: MonthRange
+    categories: list[CategoryName] | None = Field(
+        default=None, min_length=1, max_length=10,
+        description="Up to 10 complaint types, one series each; omit for all complaints combined",
+    )
+
+
+class MonthSummaryParams(BaseModel):
+    """A briefing on one month: totals, comparisons, and the top and fastest-moving complaint types."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    geography: Geography
+    month: YearMonth
+    top_n: int = Field(default=8, ge=1, le=20, description="How many top complaint types to list")
+
+
+class ForecastStatusParams(BaseModel):
+    """The latest frozen citywide forecasts and how accurate past ones were. Takes no parameters."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MonthCount(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    month: str
+    category: str
+    count: int
+    flags: list[str]
+
+
+class CategoryMonth(BaseModel):
+    """One complaint type in the briefing month, against the month before and a year before."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: str
+    count: int
+    prior_month: int | None = Field(description="None when the month before isn't in the data")
+    last_year: int | None = Field(description="None when the same month a year before isn't in the data")
+    change_vs_last_year: int | None
+    pct_vs_last_year: float | None
+    share_of_month: float | None
+    flags: list[str]
+    labels: list[str]
+
+
+class ForecastRow(BaseModel):
+    """One model's frozen prediction for one month, scored once the month is complete."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model: str
+    month: str
+    status: Literal["scored", "upcoming"]
+    predicted: int
+    actual: int | None
+    error: int | None
+    pct_error: float | None
+    trained_through: str
+    made_on: str
+    forecast_file: str
 
 
 class CategoryChange(BaseModel):
@@ -128,7 +202,7 @@ class ToolResult(BaseModel, Generic[RowT]):
 
     model_config = ConfigDict(extra="forbid")
 
-    summary: dict[str, int | float | None]
+    summary: dict[str, int | float | str | None]
     rows: list[RowT]
     warnings: list[str]
     provenance: Provenance

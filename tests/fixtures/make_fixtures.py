@@ -20,6 +20,11 @@ complete through Feb 2026; Mar 2026 is in the files as a partial month.
 category_catalog.csv is built from these tables with one reviewed
 rename, Sewer -> Sewer Maintenance.
 
+forecasts/ holds frozen citywide forecasts: one set made Dec 5, 2025 for
+Dec-Feb (scored against the citywide file: 1655, 1835, 1535), a
+superseded file from Dec 4, and one set made Mar 5, 2026 for Mar-May
+(not yet scorable). backtest_metrics.csv holds made-up backtest WAPEs.
+
 Run from the repo root to inspect the files: python -m tests.fixtures.make_fixtures
 """
 
@@ -79,6 +84,34 @@ def build_tables() -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     return category, citywide, metadata
 
 
+FORECASTS = {
+    # file: (model, made, trained through, {month: prediction})
+    "forecast_gradient_boosting_20251204_0900.csv": (
+        "gradient_boosting", "2025-12-04T09:00:00", "2025-11",
+        {"2025-12": 9999, "2026-01": 9999, "2026-02": 9999}),
+    "forecast_gradient_boosting_20251205_1000.csv": (
+        "gradient_boosting", "2025-12-05T10:00:00", "2025-11",
+        {"2025-12": 1600, "2026-01": 1700, "2026-02": 1650}),
+    "forecast_seasonal_naive_20251205_1000.csv": (
+        "seasonal_naive", "2025-12-05T10:00:00", "2025-11",
+        {"2025-12": 1655, "2026-01": 1655, "2026-02": 1655}),
+    "forecast_gradient_boosting_20260305_1000.csv": (
+        "gradient_boosting", "2026-03-05T10:00:00", "2026-02",
+        {"2026-03": 1600, "2026-04": 1620, "2026-05": 1640}),
+    "forecast_seasonal_naive_20260305_1000.csv": (
+        "seasonal_naive", "2026-03-05T10:00:00", "2026-02",
+        {"2026-03": 1655, "2026-04": 1655, "2026-05": 1655}),
+}
+SUPERSEDED = {"forecast_gradient_boosting_20251204_0900.csv": "fixture: anchored on a partial month"}
+BACKTEST = [
+    # split, model, start, end, months, MAE, RMSE, MAPE, WAPE
+    ("validation", "baseline_seasonal_lag12", "2025-01", "2025-06", 6, 40, 50, 2.5, 2.4),
+    ("validation", "gradient_boosting", "2025-01", "2025-06", 6, 60, 70, 3.6, 3.6),
+    ("test", "baseline_seasonal_lag12", "2025-07", "2026-02", 8, 90, 100, 5.5, 5.4),
+    ("test", "gradient_boosting", "2025-07", "2026-02", 8, 70, 80, 4.3, 4.2),
+]
+
+
 def write_fixtures(out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     category, citywide, metadata = build_tables()
@@ -86,6 +119,17 @@ def write_fixtures(out_dir: Path) -> Path:
     citywide.to_csv(out_dir / "monthly_citywide_counts.csv", index=False)
     (out_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     build_catalog(category, RENAMES).to_csv(out_dir / CATALOG_FILE, index=False)
+
+    forecast_dir = out_dir / "forecasts"
+    forecast_dir.mkdir(exist_ok=True)
+    for name, (model, made, trained, predictions) in FORECASTS.items():
+        pd.DataFrame({"month": [f"{m}-01" for m in predictions], "predicted_count": list(predictions.values()),
+                      "forecast_created_at": made, "training_end_month": trained, "model_name": model}
+                     ).to_csv(forecast_dir / name, index=False)
+    pd.DataFrame(list(SUPERSEDED.items()), columns=["source_file", "reason"]).to_csv(
+        forecast_dir / "superseded.csv", index=False)
+    pd.DataFrame(BACKTEST, columns=["split", "model", "period_start", "period_end", "months",
+                                    "MAE", "RMSE", "MAPE", "WAPE"]).to_csv(out_dir / "backtest_metrics.csv", index=False)
     return out_dir
 
 

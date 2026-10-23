@@ -1,0 +1,8 @@
+split,model,period_start,period_end,months,MAE,RMSE,MAPE,WAPE
+validation,baseline_previous_month,2025-01,2025-12,12,25912,34513,8.82,8.51
+validation,baseline_seasonal_lag12,2025-01,2025-12,12,17204,22959,5.44,5.65
+validation,linear_regression,2025-01,2025-12,12,22295,27713,7.19,7.32
+validation,gradient_boosting,2025-01,2025-12,12,19704,25332,6.25,6.47
+test,baseline_seasonal_lag12,2026-01,2026-09,9,34313,40662,10.34,10.33
+test,linear_regression,2026-01,2026-09,9,19478,22579,5.8,5.86
+test,gradient_boosting,2026-01,2026-09,9,22540,27631,6.66,6.78

@@ -77,9 +77,25 @@ class CategoryCatalog:
         kind = "renamed" if known.kind == "renamed" else "spelling"
         return replace(known, label=label, kind=kind)
 
-    def including(self, labels: list[str]) -> CategoryCatalog:
-        """This catalog plus fallback entries for labels it hasn't seen."""
-        extra = [self.lookup(label) for label in labels if label not in self._by_label]
+    def including(self, label_totals: dict[str, int]) -> CategoryCatalog:
+        """This catalog plus entries for labels it hasn't seen (label -> complaint total).
+
+        A new spelling of a known label joins that category. Truly new labels
+        are grouped by spelling and named by their most-used spelling, the
+        same rule build_catalog uses, so names don't depend on query order.
+        """
+        extra, unknown = [], {}
+        for label in label_totals:
+            if label in self._by_label:
+                continue
+            if spelling_key(label) in self._by_key:
+                extra.append(self.lookup(label))
+            else:
+                unknown.setdefault(spelling_key(label), []).append(label)
+        for labels in unknown.values():
+            name = min(labels, key=lambda label: (-label_totals[label], label))
+            extra += [Entry(label, slug(name), name, "unreviewed", "", "not in the category catalog")
+                      for label in labels]
         return CategoryCatalog(list(self._by_label.values()) + extra, self.source)
 
     def find(self, text: str) -> Entry | None:

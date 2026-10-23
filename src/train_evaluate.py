@@ -26,7 +26,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from config.settings import MODEL_DIR, PROCESSED_DIR
+from config.settings import LIVE_DIR, MODEL_DIR, PROCESSED_DIR
 
 FEATURES = [
     "year", "month_number", "quarter", "month_sin", "month_cos",
@@ -118,6 +118,18 @@ def main() -> None:
     joblib.dump(linear, MODEL_DIR / "linear_regression.joblib")
     summary.to_csv(PROCESSED_DIR / "model_comparison.csv")
     print(f"\nModels saved to {MODEL_DIR}, comparison table to model_comparison.csv")
+
+    # committed copy of both evaluations, so the deployed app can report them
+    splits = [("validation", validation, results)]
+    if len(test) > 0:
+        splits.append(("test", test, test_results))
+    backtest = pd.DataFrame([
+        {"split": split, "model": model, "period_start": f"{rows['month'].min():%Y-%m}",
+         "period_end": f"{rows['month'].max():%Y-%m}", "months": len(rows), **metrics}
+        for split, rows, by_model in splits for model, metrics in by_model.items()
+    ])
+    backtest.to_csv(LIVE_DIR / "backtest_metrics.csv", index=False)
+    print(f"Backtest metrics saved to {LIVE_DIR / 'backtest_metrics.csv'}")
 
 
 if __name__ == "__main__":
