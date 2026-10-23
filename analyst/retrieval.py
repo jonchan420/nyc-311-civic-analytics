@@ -3,7 +3,9 @@
 Numbers in answers always come from tools; retrieval supplies the method,
 definitions, and limits that go with them. With about 30 short sections,
 a small BM25 keyword index is enough, and every score can be explained.
-Retrieved text is data for the writer to quote, never instructions.
+Retrieved text is data for the writer to quote, never instructions; a
+section that addresses the assistant (asks it to ignore its rules, show a
+key, or call a tool) is quarantined when the notes load and never retrieved.
 """
 
 from __future__ import annotations
@@ -17,6 +19,11 @@ from pathlib import Path
 from config.settings import PROJECT_ROOT
 
 KNOWLEDGE_DIR = PROJECT_ROOT / "docs" / "knowledge"
+# text that speaks to the assistant instead of describing the data
+SUSPICIOUS = re.compile(
+    r"\b(ignore|disregard|forget|override)\b[^.?!]{0,60}\b(rules?|instructions?|prompts?|guidelines?)\b"
+    r"|\bsystem override\b|\byou are now\b|\bdeveloper mode\b|\bapi[_ ]?key\b|\bcall the \w+ tool\b",
+    re.IGNORECASE)
 STOPWORDS = set("""a an and are as at be by can do does for from has have how i if in into is it its
 of on or so than that the their them then there these this to was were what when where which
 who why will with you your""".split())
@@ -56,7 +63,9 @@ def load_chunks(knowledge_dir: Path = KNOWLEDGE_DIR) -> list[Chunk]:
 class KnowledgeBase:
     """BM25 (k1=1.5, b=0.75) over title + section heading + text of each chunk."""
 
-    def __init__(self, chunks: list[Chunk], k1: float = 1.5, b: float = 0.75):
+    def __init__(self, chunks: list[Chunk], k1: float = 1.5, b: float = 0.75, quarantine: bool = True):
+        self.quarantined = [c for c in chunks if quarantine and SUSPICIOUS.search(f"{c.section} {c.text}")]
+        chunks = [c for c in chunks if c not in self.quarantined]
         self.chunks = chunks
         self.k1, self.b = k1, b
         self._terms = [Counter(tokenize(f"{c.title} {c.section} {c.text}")) for c in chunks]

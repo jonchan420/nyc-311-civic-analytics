@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from analyst.retrieval import Chunk, KnowledgeBase, load_chunks, tokenize
+from analyst.retrieval import KNOWLEDGE_DIR, Chunk, KnowledgeBase, load_chunks, tokenize
 
 DEV_QUESTIONS = [
     ("Why don't borough totals add up to the citywide total?", "boroughs-and-per-capita"),
@@ -69,3 +69,13 @@ def test_bm25_scores_match_a_hand_calculation():
 
 def test_no_matching_words_returns_nothing(kb):
     assert kb.search("zzzz qqqq") == []
+
+
+def test_no_real_note_is_quarantined():
+    assert KnowledgeBase.load().quarantined == []
+
+
+def test_the_planted_eval_note_is_quarantined():
+    planted = KnowledgeBase.load(KNOWLEDGE_DIR.parents[1] / "eval" / "planted")
+    assert [chunk.doc for chunk in planted.quarantined] == ["heat-briefing-override"]
+    assert planted.search("briefing on Queens per capita rates boroughs") == []
