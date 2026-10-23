@@ -219,7 +219,7 @@ class Analyst:
         except ToolError as error:
             return Answer("decline", str(error), tool=plan.tool, params=plan.params, routed_by=routed_by)
         except ValidationError as error:
-            problems = "; ".join(e["msg"] for e in error.errors())
+            problems = "; ".join(e["msg"].removeprefix("Value error, ") for e in error.errors())
             return Answer("clarify", f"I couldn't run that as asked: {problems}.", tool=plan.tool,
                           params=plan.params, routed_by=routed_by)
         notes = self.knowledge.search(self._note_query(question, plan.tool, result), k=3)
