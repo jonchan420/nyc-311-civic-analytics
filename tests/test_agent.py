@@ -12,7 +12,9 @@ import plotly.graph_objects as go
 import pytest
 
 from analyst.agent import Analyst, freshness_line, tool_definitions
+from analyst.briefing import briefing_markdown
 from analyst.charts import chart_for
+from analyst.grounding import check
 from analyst.llm import BudgetGuard, FakeLLM, LLMResponse, ProviderError, ToolCall
 from analyst.retrieval import KnowledgeBase
 from analyst.schemas import MonthlyTrendParams
@@ -290,3 +292,23 @@ def test_charts(offline, fixture_dir):
     assert chart_for("monthly_trend", result).data[-1].name == "unusual month"
     result.rows = []
     assert chart_for("monthly_trend", result) is None
+
+
+# ------------------------------------------------------------------ the downloadable briefing
+
+def test_briefing(offline):
+    question = "Which complaint types changed most in Queens from January 2025 to January 2026?"
+    answer = offline.ask(question)
+    briefing = briefing_markdown(question, answer)
+    assert briefing.startswith(f"# NYC 311 briefing\n\n**Question:** {question}\n\n{answer.text}\n")
+    # share of change: +100 of the +180 total = 55.56%; Cannabis Retailer has no baseline, so no % change
+    assert ("| Complaint type | First period | Second period | Change | % change | Share of change (%) | Flags |"
+            in briefing)
+    assert "| HEAT/HOT WATER | 500 | 600 | 100 | 20 | 55.56 |  |" in briefing
+    assert "| Cannabis Retailer | 0 | 30 | 30 | – | 16.67 | new_in_b |" in briefing
+    assert '- Tool: `compare_periods` with parameters `{"geography": "QUEENS", ' in briefing
+    assert "- Data complete through Feb 2026; refreshed 2026-03-05; computed " in briefing
+    table = briefing.split("## The numbers")[1].split("## Warnings")[0]
+    assert check(table, answer.result.model_dump(mode="json")).grounded
+    declined = offline.ask("Is Brooklyn safer than Queens?")
+    assert "## " not in briefing_markdown("Is Brooklyn safer than Queens?", declined)

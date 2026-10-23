@@ -9,3 +9,5 @@ joblib==1.5.3
 streamlit==1.60.0
 plotly==6.9.0
 scipy==1.18.0
+pydantic==2.14.1
+anthropic==2.1.0

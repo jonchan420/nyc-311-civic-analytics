@@ -30,3 +30,6 @@ models/*.joblib
 
 # vs code
 .vscode/
+
+# streamlit secrets (API key, passcode); see .streamlit/secrets.toml.example
+.streamlit/secrets.toml

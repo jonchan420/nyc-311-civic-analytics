@@ -2,6 +2,7 @@
 (against a stand-in SDK object; no network, no key)."""
 
 import datetime as dt
+import threading
 from types import SimpleNamespace
 
 import anthropic
@@ -54,22 +55,42 @@ def test_structural_numbers_are_allowed():
 
 def test_budget_guard_blocks_before_the_limit():
     guard = BudgetGuard(max_requests=2, max_usd=1.0, max_tokens_per_call=1000)
-    guard.check(1000)
+    guard.reserve(1000)
     guard.record(0.4)
-    guard.check(500)
+    guard.reserve(500)
     guard.record(0.7)                     # $1.10 spent
+    assert (guard.requests, guard.usd) == (2, pytest.approx(1.1))
     with pytest.raises(BudgetExceeded, match="model calls"):
-        guard.check(500)
+        guard.reserve(500)
     with pytest.raises(BudgetExceeded, match="tokens"):
-        BudgetGuard(max_tokens_per_call=100).check(101)
+        BudgetGuard(max_tokens_per_call=100).reserve(101)
     with pytest.raises(BudgetExceeded, match="spending limit"):
-        BudgetGuard(max_usd=1.0, usd=1.0).check(10)
+        BudgetGuard(max_usd=1.0, usd=1.0).reserve(10)
 
 
 def test_budget_guard_resets_daily():
-    guard = BudgetGuard(max_requests=1, requests=1, day=dt.date(2026, 1, 1))
-    guard.check(10)                       # a new day: the counters reset
-    assert guard.requests == 0
+    guard = BudgetGuard(max_requests=1, requests=1, usd=5.0, day=dt.date(2026, 1, 1))
+    guard.reserve(10)                     # a new day: the counters reset, then this call is counted
+    assert (guard.requests, guard.usd, guard.day) == (1, 0.0, dt.date.today())
+
+
+def test_budget_guard_is_shared_safely_across_threads():
+    guard = BudgetGuard(max_requests=50)
+    outcomes = []
+
+    def worker():
+        try:
+            guard.reserve(10)
+            outcomes.append("ran")
+        except BudgetExceeded:
+            outcomes.append("blocked")
+
+    threads = [threading.Thread(target=worker) for _ in range(200)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert outcomes.count("ran") == 50 and guard.requests == 50
 
 
 def test_estimate_cost():

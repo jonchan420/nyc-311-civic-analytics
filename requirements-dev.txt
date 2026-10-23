@@ -1,6 +1,2 @@
 -r requirements.txt
-# analyst/ needs pydantic (and anthropic for live model calls) at runtime; they
-# move to requirements.txt once the dashboard imports analyst
-pydantic==2.14.1
-anthropic==2.1.0
 pytest==9.1.1

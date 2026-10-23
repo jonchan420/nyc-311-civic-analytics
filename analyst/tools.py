@@ -98,8 +98,8 @@ def compare_periods(
 
         filters = [
             f"geography: {place_name(params.geography)}; complaints with no borough recorded are excluded",
-            f"period A: {params.period_a.label()} ({params.period_a.months} months)",
-            f"period B: {params.period_b.label()} ({params.period_b.months} months)",
+            f"period A: {_span(params.period_a)}",
+            f"period B: {_span(params.period_b)}",
         ]
         if wanted:
             filters.append("complaint types: " + ", ".join(wanted.values()))
@@ -186,7 +186,7 @@ def monthly_trend(params: MonthlyTrendParams | dict[str, Any], data_dir: Path = 
 
         filters = [
             f"geography: {place_name(params.geography)}; complaints with no borough recorded are excluded",
-            f"period: {params.period.label()} ({params.period.months} months)",
+            f"period: {_span(params.period)}",
         ]
         if wanted:
             filters.append("complaint types: " + ", ".join(wanted.values()))
@@ -359,6 +359,10 @@ def _population(population_file: Path, boroughs: list[str]) -> int:
 
 
 # ---------------------------------------------------------------- shared checks
+
+def _span(period: MonthRange) -> str:
+    return f"{period.label()} ({period.months} month{'s' if period.months != 1 else ''})"
+
 
 def _label_flags(group: Group, catalog: CategoryCatalog) -> list[str]:
     kinds = {catalog.lookup(label).kind for label in group.labels}

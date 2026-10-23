@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
@@ -63,10 +64,13 @@ class ProviderError(RuntimeError):
 
 @dataclass
 class BudgetGuard:
-    """Request and spending caps, checked before every call.
+    """Daily request and spending caps, checked before every call.
 
-    Counters live in memory, so they reset when the app restarts. A hard
-    monthly limit set in the Anthropic Console is the real backstop.
+    One guard can be shared by every session of the app: reserve() counts the
+    request before the call is made, under a lock, so concurrent sessions
+    can't both take the last slot. Spending can overshoot max_usd by at most
+    the calls already in flight. Counters live in memory and reset when the
+    app restarts; a monthly limit set in the Anthropic Console is the backstop.
     """
 
     max_requests: int = 20
@@ -75,20 +79,24 @@ class BudgetGuard:
     requests: int = 0
     usd: float = 0.0
     day: dt.date = field(default_factory=dt.date.today)
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
-    def check(self, max_tokens: int) -> None:
-        if dt.date.today() != self.day:
-            self.requests, self.usd, self.day = 0, 0.0, dt.date.today()
-        if max_tokens > self.max_tokens_per_call:
-            raise BudgetExceeded(f"A call asked for {max_tokens} tokens; the limit is {self.max_tokens_per_call}.")
-        if self.requests >= self.max_requests:
-            raise BudgetExceeded(f"The limit of {self.max_requests} model calls has been reached.")
-        if self.usd >= self.max_usd:
-            raise BudgetExceeded(f"The ${self.max_usd:.2f} spending limit has been reached.")
+    def reserve(self, max_tokens: int) -> None:
+        """Raise BudgetExceeded, or count one request for the call about to be made."""
+        with self._lock:
+            if dt.date.today() != self.day:
+                self.requests, self.usd, self.day = 0, 0.0, dt.date.today()
+            if max_tokens > self.max_tokens_per_call:
+                raise BudgetExceeded(f"A call asked for {max_tokens} tokens; the limit is {self.max_tokens_per_call}.")
+            if self.requests >= self.max_requests:
+                raise BudgetExceeded(f"The limit of {self.max_requests} model calls a day has been reached.")
+            if self.usd >= self.max_usd:
+                raise BudgetExceeded(f"The ${self.max_usd:.2f} daily spending limit has been reached.")
+            self.requests += 1
 
     def record(self, cost_usd: float) -> None:
-        self.requests += 1
-        self.usd += cost_usd
+        with self._lock:
+            self.usd += cost_usd
 
 
 def estimate_cost(model: str, usage: dict[str, int]) -> float:
@@ -118,7 +126,7 @@ class FakeLLM:
     def complete(self, *, system: str, messages: list[dict[str, Any]],
                  tools: list[dict[str, Any]] | None = None, max_tokens: int = 2000) -> LLMResponse:
         if self.budget:
-            self.budget.check(max_tokens)
+            self.budget.reserve(max_tokens)
         self.requests.append({"system": system, "messages": copy.deepcopy(messages), "tools": tools})
         if callable(self.script):
             response = self.script(system, messages, tools)
@@ -148,7 +156,7 @@ class ClaudeClient:
 
     def complete(self, *, system: str, messages: list[dict[str, Any]],
                  tools: list[dict[str, Any]] | None = None, max_tokens: int = 2000) -> LLMResponse:
-        self.budget.check(max_tokens)
+        self.budget.reserve(max_tokens)
         request: dict[str, Any] = {
             "model": self.model,
             "max_tokens": max_tokens,
