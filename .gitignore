@@ -18,6 +18,9 @@ __pycache__/
 .venv/
 venv/
 .ipynb_checkpoints/
+.pytest_cache/
+# written by running tests/fixtures/make_fixtures.py by hand; tests build their own
+tests/fixtures/live/
 
 # models
 models/*.joblib

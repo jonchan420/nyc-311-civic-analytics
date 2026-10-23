@@ -1,0 +1,5 @@
+-r requirements.txt
+# analyst/ needs pydantic at runtime; it moves to requirements.txt once the
+# dashboard imports analyst (Phase 1)
+pydantic==2.14.1
+pytest==9.1.1
