@@ -65,6 +65,18 @@ side: rules, tools, and templates, with no model and no key.
 Signs aren't checked by the grounding check, so "rose 11,479" for a fall of 11,479 passes it.
 Direction words come from the writer prompt's rules, and the templates write them from the sign.
 
+## Tradeoffs
+
+| Choice | What it buys | What it costs |
+|---|---|---|
+| Rules read questions before any model | Free, instant, the same answer every time, and testable case by case. All 30 held-out questions were placed without a model. | Brittle on phrasings the rules haven't seen: the held-out run missed "Tell me a story about the Bronx". In model mode, the planner covers what the rules can't place. |
+| Templates write the offline answer | They can't invent a number, and they're the fallback when a model's answer fails the grounding check | They read stiffly, and they can't weave in context the way a model can |
+| The grounding check matches numbers, not meaning | It catches invented or mis-copied numbers, abbreviations, and computed shares | It can't check direction words ("rose" for a fall); those rely on the prompt and the eval |
+| BM25 over about 35 note sections | No embedding service or index to host, and every score can be explained | It misses synonyms the notes don't use; the eval's source-support cases guard the common ones |
+| Pattern-based quarantine of notes | It removes text that plainly addresses the assistant before any model sees it | A planted claim worded like ordinary data could pass it; for tool answers, the grounding check is the backstop |
+| Borough and month only | It matches the monthly aggregates the dashboard already refreshes and can verify | No neighborhoods, ZIP codes, or response times until record-level tables are added |
+| Synthetic fixtures for evaluation | Fixed, hand-checkable answers, with an independent oracle | They're cleaner than the real data, so a few real-data checks (such as the Queens summer totals) are kept separately |
+
 ## Data and freshness
 
 The app reads `data/live/`. The monthly GitHub Action refreshes it on the 5th with complete
