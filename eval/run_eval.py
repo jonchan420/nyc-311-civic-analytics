@@ -77,7 +77,9 @@ def normalized(tool: str, params: dict[str, Any]) -> dict[str, Any]:
 def git_commit() -> tuple[str, bool]:
     def git(*args: str) -> str:
         return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    return git("rev-parse", "--short", "HEAD") or "nogit", bool(git("status", "--porcelain"))
+    # the runner's own output doesn't count as a change to the code under test
+    changed = git("status", "--porcelain", "--", ".", ":!eval/results", ":!eval/RESULTS.md")
+    return git("rev-parse", "--short", "HEAD") or "nogit", bool(changed)
 
 
 # ------------------------------------------------------------------ the model under test
