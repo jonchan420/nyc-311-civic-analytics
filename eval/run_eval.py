@@ -131,13 +131,13 @@ def numbers_check(case: dict[str, Any], data_dir: Path) -> list[str]:
         kwargs["forecast_dir"] = data_dir / "forecasts"
     result = TOOLS[tool].run(params, **kwargs)
     summary = result.summary
-    wanted: dict[str, Any] = dict(expect.get("numbers", {}))
+    from_oracle: dict[str, Any] = {}
     problems = []
     if tool == "compare_periods":
         a, b = params["period_a"], params["period_b"]
         total_a, total_b, rows = oracle.compare(data_dir, params["geography"], (a["start"], a["end"]),
                                                 (b["start"], b["end"]), params.get("categories"))
-        wanted |= {"total_a": total_a, "total_b": total_b}
+        from_oracle = {"total_a": total_a, "total_b": total_b}
         got = [(r.category, r.count_a, r.count_b, r.change, r.pct_change, r.share_of_change) for r in result.rows]
         expected_rows = rows[: params["top_n"]]
         if len(got) != len(expected_rows) or not all(
@@ -150,7 +150,7 @@ def numbers_check(case: dict[str, Any], data_dir: Path) -> list[str]:
             got = [row.count for row in result.rows if row.category == name]
             if got != counts:
                 problems.append(f"{name} monthly counts {got} vs oracle {counts}")
-        wanted |= expected
+        from_oracle = expected
     elif tool == "month_summary":
         expected = oracle.month_summary(data_dir, params["geography"], params["month"], POPULATION_FILE,
                                         params["top_n"])
@@ -158,10 +158,12 @@ def numbers_check(case: dict[str, Any], data_dir: Path) -> list[str]:
         got = [(r.category, r.count, r.last_year, r.change_vs_last_year) for r in result.rows]
         if got != rows:
             problems.append(f"briefing rows {got[:3]} vs oracle {rows[:3]}")
-        wanted |= expected
-    for key, value in wanted.items():
-        if not same(value, summary.get(key)):
-            problems.append(f"{key}: {summary.get(key)!r}, expected {value!r}")
+        from_oracle = expected
+    # each source is checked on its own, so a hand number can't be masked by the oracle's
+    for source, wanted in (("oracle", from_oracle), ("by hand", expect.get("numbers", {}))):
+        for key, value in wanted.items():
+            if not same(value, summary.get(key)):
+                problems.append(f"{key}: {summary.get(key)!r}, expected {value!r} ({source})")
     return problems
 
 
@@ -248,9 +250,28 @@ def evaluate(cases_name: str, mode: str, repeats: int, model: str, effort: str,
     budget = BudgetGuard(max_requests=max_calls, max_usd=max_usd) if mode == "claude" else None
     claude = ClaudeClient(model=model, effort=effort, budget=budget) if mode == "claude" else None
     secret = os.environ.get("ANTHROPIC_API_KEY", "") if mode == "claude" else CANARY
+    saved_key = os.environ.get("ANTHROPIC_API_KEY")
     if mode != "claude":
         os.environ["ANTHROPIC_API_KEY"] = CANARY  # anything that leaked the key would leak this
 
+    try:
+        outcomes = run_cases(cases, mode, repeats, claude, secret, knowledge, planted, unfiltered)
+    finally:
+        if mode != "claude":
+            if saved_key is None:
+                os.environ.pop("ANTHROPIC_API_KEY", None)
+            else:
+                os.environ["ANTHROPIC_API_KEY"] = saved_key
+    run = {"date": dt.date.today().isoformat(), "started_at": started_at, "cases": cases_name,
+           "case_file": CASE_FILES[cases_name].name, "case_file_sha256": digest, "mode": mode,
+           "model": model if mode == "claude" else mode, "effort": effort if mode == "claude" else None,
+           "repeats": repeats, "commit": commit, "uncommitted_changes": dirty, "python": platform.python_version(),
+           "limits": {"max_calls": max_calls, "max_usd": max_usd} if mode == "claude" else None}
+    return summarize_run(outcomes, thresholds, run)
+
+
+def run_cases(cases: list[dict[str, Any]], mode: str, repeats: int, claude: ClaudeClient | None, secret: str,
+              knowledge: KnowledgeBase, planted: KnowledgeBase, unfiltered: KnowledgeBase) -> list[dict[str, Any]]:
     outcomes = []
     with tempfile.TemporaryDirectory() as tmp:
         data_dir = write_fixtures(Path(tmp) / "live")
@@ -272,7 +293,11 @@ def evaluate(cases_name: str, mode: str, repeats: int, model: str, effort: str,
             outcomes.append({"id": case["id"], "question": case["question"], "expect": case["expect"],
                              "rules_route": route(case["question"], context).kind,
                              "numbers": mismatches, "runs": runs})
+    return outcomes
 
+
+def summarize_run(outcomes: list[dict[str, Any]], thresholds: dict[str, Any], run: dict[str, Any]) -> dict[str, Any]:
+    repeats = run["repeats"]
     metrics: dict[str, dict[str, Any]] = {}
     for metric in METRICS:
         passed, failures = 0, []
@@ -303,10 +328,10 @@ def evaluate(cases_name: str, mode: str, repeats: int, model: str, effort: str,
         entry |= {"passed": passed, "value": value, "threshold": threshold,
                   "met": None if value is None else value >= threshold, "failures": failures}
 
-    every_run = [run for outcome in outcomes for run in outcome["runs"]]
+    every_run = [one for outcome in outcomes for one in outcome["runs"]]
     usage: Counter = Counter()
-    for run in every_run:
-        usage.update(run["usage"])
+    for one in every_run:
+        usage.update(one["usage"])
     report_only = {
         "questions_run": len(every_run),
         "placed_by_rules": sum(o["rules_route"] != "model" for o in outcomes) / len(outcomes),
@@ -317,11 +342,7 @@ def evaluate(cases_name: str, mode: str, repeats: int, model: str, effort: str,
         "tokens": dict(usage),
     }
     return {
-        "run": {"date": dt.date.today().isoformat(), "started_at": started_at, "cases": cases_name, "case_file": CASE_FILES[cases_name].name,
-                "case_file_sha256": digest, "mode": mode, "model": model if mode == "claude" else mode,
-                "effort": effort if mode == "claude" else None, "repeats": repeats, "commit": commit,
-                "uncommitted_changes": dirty, "python": platform.python_version(),
-                "limits": {"max_calls": max_calls, "max_usd": max_usd} if mode == "claude" else None},
+        "run": run,
         "metrics": metrics,
         "report_only": report_only,
         "cases": outcomes,
