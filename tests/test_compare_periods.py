@@ -11,7 +11,8 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-from analyst.schemas import CategoryChange, ComparePeriodsParams, ToolResult
+from analyst.data import DataSource
+from analyst.schemas import CategoryChange, ComparePeriodsParams, MonthRange, ToolResult
 from analyst.tools import DataUnavailableError, UnknownCategoryError, compare_periods
 from config.settings import PROJECT_ROOT
 from tests.fixtures.make_fixtures import write_fixtures
@@ -247,3 +248,15 @@ def test_real_data_totals_match_an_independent_query():
     assert result.summary["total_a"] == queens.loc[month.between("2025-06", "2025-08"), "complaint_count"].sum()
     assert result.summary["total_b"] == queens.loc[month.between("2026-06", "2026-08"), "complaint_count"].sum()
     assert "Sewer" not in {r.category for r in result.rows}
+
+
+def test_sql_takes_values_only_as_bound_parameters(fixture_dir):
+    with DataSource(fixture_dir) as source:     # window names become column names, so they're checked
+        with pytest.raises(ValueError, match="bad window name"):
+            source.counts_by_label(["QUEENS"], {"a; DROP TABLE borough_category": MonthRange(start="2025-01",
+                                                                                           end="2025-01")})
+    params = {"geography": "QUEENS", "period_a": {"start": "2025-01", "end": "2025-01"},
+              "period_b": {"start": "2026-01", "end": "2026-01"}}
+    with pytest.raises(UnknownCategoryError):
+        compare_periods({**params, "categories": ["Noise'); DROP TABLE borough_category; --"]}, data_dir=fixture_dir)
+    assert compare_periods(params, data_dir=fixture_dir).summary["total_b"] == 1225   # nothing was dropped

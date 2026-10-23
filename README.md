@@ -45,6 +45,11 @@ scrollback.
   English file noticeably fewer housing complaints than their
   buildings' conditions would predict. Chinatown files about half as
   many as expected.
+- **Ask the data a question.** The Ask 311 page answers questions like
+  "What drove the change in Queens last summer?" from checked
+  calculations, never from the AI model's memory, and shows exactly how
+  each number was computed. On 30 sealed test questions it met 10 of its
+  11 targets, set in advance.
 - **The big lesson:** a complaint count shows who speaks up, not just
   where the problems are. A city that sent help based on complaints
   alone would shortchange the people who face the most barriers to
@@ -147,6 +152,7 @@ cd nyc-311-civic-analytics
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -r requirements-dev.txt    # tests, the evaluation, and the optional MCP server
 ```
 
 Edit `config/settings.py` and set `RAW_CSV_PATH` to wherever your
@@ -166,8 +172,21 @@ python src/forecast_seasonal_naive.py  # 8. freeze a 3-month seasonal-naive fore
 python src/anomaly_analysis.py         # 9. record-level findings behind the 2026 break
 python src/fetch_reporting_gap_data.py # 10. 311 + Census + NYCHA + boundaries -> data/equity/ (one-time, ~1 min)
 python src/reporting_gap_analysis.py   # 11. who files fewer complaints than housing predicts
-streamlit run dashboard/app.py         # 12. dashboard
+streamlit run dashboard/app.py         # 12. dashboard, with the Ask 311 page
 ```
+
+The assistant needs only `data/live/`, which is in the repo, so these work
+right after cloning:
+
+```bash
+pytest                                 # unit, oracle, security, and page tests (no network, no key)
+python eval/run_eval.py                # development questions, rules only; writes eval/results/
+python analyst/mcp_server.py           # the tools as an MCP server over stdio
+```
+
+To turn on Claude in the Ask 311 page, copy `.streamlit/secrets.toml.example`
+to `.streamlit/secrets.toml` and fill in the key, a passcode, and the daily
+limits. Without it, the page runs offline.
 
 Monthly refresh runs automatically (see "Live, automated forecasting"
 below). To run the same steps by hand, with no raw data needed:
@@ -204,7 +223,12 @@ data/equity/                311 + Census + NYCHA inputs and neighborhood boundar
 data/equity/results/        reporting-gap results and robustness checks (tracked in git)
 data/borough_population.csv 2020 Census borough populations (tracked in git)
 src/                        pipeline scripts, numbered by run order above
-dashboard/                  Streamlit app
+analyst/                    Ask 311: router, tools, grounding check, model client, MCP server
+docs/knowledge/             method notes the assistant retrieves and cites
+docs/ARCHITECTURE.md        how Ask 311 works and where each safeguard is tested
+eval/                       evaluation questions, thresholds, runner, and every result
+tests/                      unit, oracle, security, and Streamlit page tests on synthetic fixtures
+dashboard/                  Streamlit app: app.py (entry), overview.py (dashboard), ask.py (Ask 311)
 notebooks/                  currently empty — original EST 389 notebook not yet
                              recovered from prior machine
 report/                     currently empty — EST 389 final report not yet
@@ -614,6 +638,73 @@ households with limited English file markedly fewer housing complaints,
 so an agency allocating inspections by complaint volume would likely
 send fewer of them there.
 
+## Ask 311: an assistant that shows its work
+
+The dashboard's **Ask 311** page answers plain-English questions about the
+complaint data, such as "Which complaint types drove the change in Queens
+between last summer and the summer before?" or "Brief me on Manhattan last
+month." Every answer comes with its chart, its warnings, the exact
+calculation and source files behind it, and the method notes it relied on.
+Each answer can be downloaded as a short Markdown briefing.
+
+**The model never produces a number.** Questions are read by rules into one
+of four checked analysis tools, which run parameterized SQL over the same
+monthly tables as the dashboard. Without an API key, which is the default,
+fixed templates write the answer from the result, so no AI model is
+involved. With Claude turned on, the model can pick a tool for a question
+the rules can't place and can word the answer. An answer with any number
+that isn't in the tool's result is thrown out and replaced by the template.
+The assistant also:
+
+- uses complete months only, and says which months a phrase like "last
+  summer" was read as;
+- declines what the data can't answer (response times, crime, addresses,
+  ZIP codes, why something happened) and asks a question back when a
+  question is ambiguous;
+- talks about recorded complaints, never about conditions getting better or
+  worse;
+- ignores instructions written into a question or planted in a retrieved
+  document.
+
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) shows the full design and
+where each safeguard is tested. The same tools are also available as an MCP
+server (`analyst/mcp_server.py`), so Claude Desktop or another agent gets
+the same checked numbers.
+
+**How it was tested.** The targets were set before any of the assistant
+was built. There are 32 development questions and 30 held-out questions,
+which were sealed with a committed hash and run once at the end. All of
+them run on small synthetic tables whose right answers come from an
+independent pandas implementation and from hand calculations. Held-out
+results with rules and templates only, each question run 5 times:
+
+| Check | Held-out result | Target |
+|---|---|---|
+| Picked the right tool | 100% (70/70) | 90% |
+| ...with exactly the right parameters | 100% (70/70) | 90% |
+| Numbers match the independent implementation | 100% (14/14) | 100% |
+| Every number in an answer traced to the tool result | 100% (90/90) | 100% |
+| Retrieved the right method note | 100% (20/20) | 85% |
+| Asked back when it should | 100% (25/25) | 85% |
+| Didn't ask back when it shouldn't | 100% (125/125) | 85% |
+| Declined months that aren't complete yet | 100% (10/10) | 100% |
+| Declined out-of-scope questions | 83% (25/30), **missed** | 95% |
+| Ignored injected instructions | 100% (10/10) | 100% |
+| Gave the same answer every run | 100% (30/30) | 90% |
+
+It missed one target. "Tell me a story about the Bronx" got a chart of
+Bronx complaints instead of a polite no, because the rule written for "Write
+me a poem" didn't generalize. The run also showed a blind spot in the
+checks themselves. "How is forecast accuracy scored?" got the forecast
+instead of the explanation, and no target caught it. Both were fixed
+afterwards and are covered by new test questions. The held-out result above
+stands as measured, because re-running sealed questions after fixing them
+would no longer test anything. Every run, including the first development
+run that missed five targets, is in [eval/RESULTS.md](eval/RESULTS.md).
+
+These results are for the offline mode. Claude mode hasn't been run
+against these questions yet, because that run makes paid API calls.
+
 ## Data responsibility
 
 311 complaint counts are not a direct measurement of actual
@@ -684,6 +775,12 @@ problems, crime, or infrastructure failure.
   survived the fix; several neighborhoods' numbers didn't.
 
 ## Future work
+
+**Measure Ask 311 with Claude turned on.** So far the evaluation covers
+the offline mode. The next run sends the same questions through Claude, 5
+times each, and records cost, speed, and how often the grounding check had
+to replace the model's answer. It also needs a fresh set of held-out
+questions, because the first set has now been used.
 
 **A stronger test of under-reporting.** The reporting-gap analysis
 compares complaints with what the Census says about housing, which
