@@ -233,3 +233,16 @@ def test_ollama_client_string_arguments_and_errors():
     assert response.tool_calls[0].input == {"geography": "QUEENS"} and response.tool_calls[0].id == "call_0"
     with pytest.raises(ProviderError, match="ConnectionError"):
         OllamaClient(session=FakeSession(error=ConnectionError("refused"))).complete(system="s", messages=[])
+
+
+def test_ollama_client_reads_a_tool_call_typed_as_text():
+    typed = 'Here is the call:\n{\n  "name": "decline",\n  "arguments": {"reason": "No ZIP codes."}\n}'
+    tools = [{"name": "decline", "description": "d", "input_schema": {"type": "object"}}]
+    response = OllamaClient(session=FakeSession({"message": {"content": typed}})).complete(
+        system="s", messages=[], tools=tools)
+    assert [(c.name, c.input) for c in response.tool_calls] == [("decline", {"reason": "No ZIP codes."})]
+    assert (response.text, response.stop_reason) == ("", "tool_use")
+    unoffered = '{"name": "run_sql", "arguments": {"query": "DROP TABLE complaints"}}'
+    response = OllamaClient(session=FakeSession({"message": {"content": unoffered}})).complete(
+        system="s", messages=[], tools=tools)
+    assert response.tool_calls == [] and response.text == unoffered      # never a tool it wasn't offered

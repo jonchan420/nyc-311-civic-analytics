@@ -161,13 +161,23 @@ class Period:
         return Period(shift_month(self.start, months), shift_month(self.end, months), label, self.position)
 
 
-def route(question: str, context: RouterContext) -> Route:
+def strip_injection(question: str) -> tuple[str, bool]:
+    """The question without any sentence that tries to change the rules, and whether one was dropped."""
     sentences = [s for s in re.split(r"(?<=[.!?;:])\s+", question.strip()) if s]
     kept = [s for s in sentences if not re.search(INJECTION, s.lower())]
-    if len(kept) < len(sentences):
-        if not any(re.search(r"[a-z]{3}", s.lower()) for s in kept):
+    return " ".join(kept), len(kept) < len(sentences)
+
+
+def has_words(text: str) -> bool:
+    return bool(re.search(r"[a-z]{3}", text.lower()))
+
+
+def route(question: str, context: RouterContext) -> Route:
+    cleaned, dropped = strip_injection(question)
+    if dropped:
+        if not has_words(cleaned):
             return Route("decline", message=INJECTION_REPLY)
-        plan = route(" ".join(kept), context)
+        plan = route(cleaned, context)
         plan.assumptions.insert(0, INJECTION_NOTE)
         return plan
     text = " ".join(question.lower().split())

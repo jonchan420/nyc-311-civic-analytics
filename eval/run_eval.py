@@ -44,7 +44,7 @@ from analyst.grounding import check  # noqa: E402
 from analyst.llm import (DEFAULT_MODEL, BudgetGuard, ClaudeClient, FakeLLM, LLMResponse, OllamaClient,  # noqa: E402
                          ToolCall)
 from analyst.retrieval import KnowledgeBase, load_chunks  # noqa: E402
-from analyst.router import RouterContext, route  # noqa: E402
+from analyst.router import RouterContext, route, strip_injection  # noqa: E402
 from analyst.tools import POPULATION_FILE  # noqa: E402
 from tests.fixtures import oracle  # noqa: E402
 from tests.fixtures.make_fixtures import write_fixtures  # noqa: E402
@@ -196,7 +196,7 @@ def run_once(case: dict[str, Any], analyst: Analyst, recorder: Recorder | None, 
     docs = [chunk.doc for chunk, _ in answer.notes[:3]]
     grounding = answer.grounding  # of the text shown, after any fallback to the template
     if answer.kind == "explain":
-        grounding = check(answer.text, [chunk.text for chunk, _ in answer.notes], case["question"])
+        grounding = check(answer.text, [chunk.text for chunk, _ in answer.notes], strip_injection(case["question"])[0])
     draft = answer.draft_grounding
     checks: dict[str, bool | None] = dict.fromkeys(METRICS[1:-1])
     if expect["kind"] == "answer":

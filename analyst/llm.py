@@ -245,9 +245,30 @@ class OllamaClient:
                 except json.JSONDecodeError:
                     arguments = {}
             calls.append(ToolCall(call.get("id") or f"call_{i}", call["function"]["name"], dict(arguments)))
+        text = message.get("content") or ""
+        if not calls and tools:  # small models sometimes type the call out instead of making it
+            typed = tool_call_in_text(text, {t["name"] for t in tools})
+            if typed is not None:
+                calls, text = [typed], ""
         stop = "tool_use" if calls else "max_tokens" if data.get("done_reason") == "length" else "end_turn"
         usage = {"input_tokens": data.get("prompt_eval_count", 0), "output_tokens": data.get("eval_count", 0)}
-        return LLMResponse(message.get("content") or "", calls, stop, data.get("model", self.model), usage, 0.0)
+        return LLMResponse(text, calls, stop, data.get("model", self.model), usage, 0.0)
+
+
+def tool_call_in_text(text: str, tool_names: set[str]) -> ToolCall | None:
+    """A tool call written as JSON in the reply text ({"name": ..., "arguments": {...}}),
+    accepted only when it names one of the tools that were offered."""
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        return None
+    try:
+        data = json.loads(text[start:end + 1])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict) or data.get("name") not in tool_names:
+        return None
+    arguments = data.get("arguments") or data.get("parameters") or {}
+    return ToolCall("call_text_0", data["name"], arguments) if isinstance(arguments, dict) else None
 
 
 def ollama_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
