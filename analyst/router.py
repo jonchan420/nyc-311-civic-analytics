@@ -64,7 +64,9 @@ INJECTION_REPLY = ("I can't change how I work, follow instructions written into 
 INJECTION_NOTE = "Part of the question asked me to change how I work; that part was ignored."
 DECLINES = [
     (r"\b(write|compose|create|generate|draft)\b[^.?!]*\b(poems?|story|stories|songs?|jokes?|essays?|haikus?|"
-     r"limericks?|raps?|lyrics)\b", OFF_TOPIC),
+     r"limericks?|raps?|lyrics)\b"
+     r"|\b(tell|sing|make up|give)\b[^.?!]{0,20}\b(a|an|some)\s+(\w+\s+){0,2}(poems?|story|stories|songs?|jokes?|"
+     r"riddles?|haikus?|limericks?|raps?)\b", OFF_TOPIC),
     (r"\b(select|insert|update|delete|drop)\b.+\b(from|into|table|where)\b|\bsql\b",
      "I can't run SQL or code someone supplies. Ask the question in words and I'll pick one of the "
      "checked calculations."),
@@ -85,7 +87,8 @@ DECLINES = [
      "Agency performance isn't something these complaint counts can measure."),
 ]
 VAGUE_TIME = r"\b(recently|lately|these days|nowadays)\b"
-DEFINITION = r"\b(mean|means|meaning|defined|definition|count as|counts as|counted as|calculated|computed)\b"
+DEFINITION = (r"\b(mean|means|meaning|defined|definition|count as|counts as|counted as|calculated|computed|"
+              r"scored|measured)\b")
 # words that show a question is about the complaint data, when no place, period, or type is named
 DATA_WORDS = (r"\b(complaints?|requests?|311|calls?|reports?|reported|reporting|filed|counts?|numbers?|totals?|"
               r"trends?|changes?|changed|chang\w*|rise|rose|risen|rising|increase\w*|decrease\w*|drop\w*|fell|"
@@ -177,6 +180,8 @@ def route(question: str, context: RouterContext) -> Route:
         return place
     geography = place.params["geography"]
 
+    if re.search(r"^(how|what|which)\b", text) and re.search(DEFINITION, text):  # how a number is made, not the number
+        return Route("explain", message="method question")
     forecast = bool(re.search(r"\b(forecasts?|predict(s|ed|ion|ions)?|projections?|next month|expect(ed)? next)\b", text))
     if forecast:
         assumptions = []
