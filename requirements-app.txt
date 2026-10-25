@@ -1,0 +1,12 @@
+# What the Streamlit app imports at runtime; the Docker image installs only this.
+# Same pins as requirements.txt (tests/test_requirements.py keeps them in step). The
+# training pipeline's extras (scikit-learn, SciPy, matplotlib, joblib) stay out.
+streamlit==1.60.0
+pandas==3.0.5
+numpy==2.5.1
+pyarrow==24.0.0
+duckdb==1.5.5
+plotly==6.9.0
+requests==2.34.2
+pydantic==2.14.1
+anthropic==2.1.0

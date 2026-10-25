@@ -1,0 +1,37 @@
+# Keep the image small and free of anything private.
+.git
+.github
+.venv
+venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.DS_Store
+.vscode
+
+# raw and local-only data (data/live, data/forecasts, data/equity are what the app reads)
+data/raw
+data/processed
+models
+visuals
+notebooks
+report
+
+# secrets and credentials, in case any are ever put in the working tree
+.streamlit/secrets.toml
+.env
+.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*credentials*.json
+**/*service-account*.json
+**/*-key.json
+gha-creds-*.json
+
+# development only
+tests
+eval
+sql
+requirements-dev.txt
+requirements-cloud.txt
