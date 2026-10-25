@@ -1,0 +1,4 @@
+# Optional: loading data/live/ into BigQuery (src/sync_bigquery.py, src/bigquery_parity.py).
+# The Streamlit app and the Docker image don't need it.
+-r requirements.txt
+google-cloud-bigquery==3.46.2
