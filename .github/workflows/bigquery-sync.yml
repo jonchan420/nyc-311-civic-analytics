@@ -7,8 +7,6 @@ name: BigQuery sync
 # set. Setup: docs/ARCHITECTURE.md.
 on:
   workflow_dispatch:
-  push:
-    branches: [cloud-bigquery-docker]  # temporary: proves federation works before merging
 
 permissions:
   contents: read
