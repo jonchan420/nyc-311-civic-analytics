@@ -1,0 +1,49 @@
+name: BigQuery sync
+
+# Loads data/live/ into BigQuery. Authenticates with Workload Identity Federation: GitHub's
+# short-lived OIDC token is exchanged for a Google token, so there is no key to store or leak.
+# The monthly refresh runs the same steps after it commits new data; this workflow runs them
+# by hand. Skipped unless the GCP_PROJECT_ID and GCP_WORKLOAD_IDENTITY_PROVIDER secrets are
+# set. Setup: docs/ARCHITECTURE.md.
+on:
+  workflow_dispatch:
+  push:
+    branches: [cloud-bigquery-docker]  # temporary: proves federation works before merging
+
+permissions:
+  contents: read
+  id-token: write  # lets the job ask GitHub for its OIDC token
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+    steps:
+      - name: Skip unless BigQuery is configured
+        if: env.GCP_PROJECT_ID == '' || env.GCP_WORKLOAD_IDENTITY_PROVIDER == ''
+        run: echo "The GCP secrets aren't set, so the BigQuery sync is skipped."
+
+      - uses: actions/checkout@v7
+        if: env.GCP_PROJECT_ID != '' && env.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+
+      - uses: actions/setup-python@v7
+        if: env.GCP_PROJECT_ID != '' && env.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation, no key)
+        if: env.GCP_PROJECT_ID != '' && env.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Load data/live into BigQuery
+        if: env.GCP_PROJECT_ID != '' && env.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        run: |
+          pip install -r requirements-cloud.txt
+          python src/sync_bigquery.py

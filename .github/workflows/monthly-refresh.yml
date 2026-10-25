@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write  # only used by the optional BigQuery sync below
 
 concurrency:
   group: monthly-refresh
@@ -20,6 +21,9 @@ jobs:
     # the Python build or system libraries between monthly runs
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
     steps:
       - uses: actions/checkout@v7
 
@@ -66,3 +70,18 @@ jobs:
             fi
             git push
           fi
+
+      # Optional: reload the BigQuery copy (sandbox tables expire after 60 days). Runs only when
+      # the GCP secrets are set, and authenticates with Workload Identity Federation, no key file.
+      - name: Authenticate to Google Cloud (Workload Identity Federation, no key)
+        if: env.GCP_PROJECT_ID != '' && env.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Load data/live into BigQuery
+        if: env.GCP_PROJECT_ID != '' && env.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        run: |
+          pip install -r requirements-cloud.txt
+          python src/sync_bigquery.py
