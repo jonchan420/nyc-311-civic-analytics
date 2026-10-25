@@ -33,3 +33,6 @@ models/*.joblib
 
 # streamlit secrets (API key, passcode); see .streamlit/secrets.toml.example
 .streamlit/secrets.toml
+
+# credentials files written by google-github-actions/auth in CI; never committed
+gha-creds-*.json

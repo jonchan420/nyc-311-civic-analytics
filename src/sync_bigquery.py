@@ -96,13 +96,26 @@ def payload(path: Path) -> bytes:
     return path.read_bytes()
 
 
-def sync(client: Any, target: Target, data_dir: Path = LIVE_DIR) -> dict[str, int]:
-    """Create the dataset if needed and replace every table. Returns rows loaded per table."""
+def ensure_dataset(client: Any, target: Target) -> bool:
+    """Create the dataset if it doesn't exist; True if it was created. Looking it up first
+    means a CI identity needs rights on this dataset only, not to create datasets."""
+    from google.api_core.exceptions import NotFound
     from google.cloud import bigquery
 
-    dataset = bigquery.Dataset(f"{target.project}.{target.dataset}")
-    dataset.location = LOCATION
-    client.create_dataset(dataset, exists_ok=True)
+    try:
+        client.get_dataset(f"{target.project}.{target.dataset}")
+        return False
+    except NotFound:
+        dataset = bigquery.Dataset(f"{target.project}.{target.dataset}")
+        dataset.location = LOCATION
+        client.create_dataset(dataset, exists_ok=True)
+        return True
+
+
+def sync(client: Any, target: Target, data_dir: Path = LIVE_DIR) -> dict[str, int]:
+    """Create the dataset if needed and replace every table. Returns rows loaded per table."""
+    if ensure_dataset(client, target):
+        print(f"  created dataset {target.project}.{target.dataset} in {LOCATION}")
     loaded = {}
     for name, path in live_tables(data_dir).items():
         job = client.load_table_from_file(io.BytesIO(payload(path)), target.table(name),

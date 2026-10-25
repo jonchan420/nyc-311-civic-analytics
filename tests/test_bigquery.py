@@ -10,6 +10,7 @@ import json
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
+from google.api_core.exceptions import NotFound
 from google.cloud import bigquery
 
 from src import bigquery_parity as parity
@@ -38,9 +39,14 @@ class FakeRow:
 class FakeClient:
     """Stands in for bigquery.Client; answers queries with whatever `answer` returns."""
 
-    def __init__(self, answer=None, estimate=12_345):
-        self.answer, self.estimate = answer, estimate
+    def __init__(self, answer=None, estimate=12_345, existing=()):
+        self.answer, self.estimate, self.existing = answer, estimate, set(existing)
         self.datasets, self.loads, self.queries = [], [], []
+
+    def get_dataset(self, ref):
+        if ref not in self.existing:
+            raise NotFound(f"Dataset {ref} not found")
+        return ref
 
     def create_dataset(self, dataset, exists_ok=False):
         self.datasets.append((dataset.project, dataset.dataset_id, dataset.location, exists_ok))
@@ -80,6 +86,12 @@ def test_sync_replaces_every_table_with_a_load_job(fixture_dir):
     # rows as the files hold them: 15 months in the citywide file, one metadata record
     assert loaded["monthly_citywide_counts"] == 15 and loaded["metadata"] == 1
     assert loaded["monthly_borough_category"] == len(pd.read_parquet(fixture_dir / "monthly_borough_category.parquet"))
+
+
+def test_an_existing_dataset_is_reused_not_created(fixture_dir):
+    client = FakeClient(existing={"demo-project-123.nyc_311"})
+    sync(client, TARGET, fixture_dir)
+    assert client.datasets == [] and len(client.loads) == 5
 
 
 def test_metadata_becomes_one_json_line(fixture_dir):
