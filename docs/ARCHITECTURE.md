@@ -97,3 +97,65 @@ committed hash before the runner existed. Expected numbers come from an independ
 oracle (`tests/fixtures/oracle.py`) and from hand calculations on synthetic fixtures. The
 thresholds were fixed before the assistant was built. See `eval/README.md` for how to run it
 and `eval/RESULTS.md` for every result, including the misses.
+
+## Where it runs, for free
+
+| Piece | Where | What keeps it free |
+|---|---|---|
+| Dashboard and Ask 311 | Streamlit Community Cloud, from `master` | Free hosting; offline mode needs no API key |
+| Monthly refresh, scoring, frozen forecasts | GitHub Actions (`monthly-refresh.yml`) | Free for a public repository |
+| Tests, and the Docker image build | GitHub Actions (`tests.yml`) | Free; the image is built and health-checked, never pushed |
+| A copy of `data/live/` (7 tables) | BigQuery sandbox, in a project with billing turned off | See the limits below |
+| The container | Your machine (`docker run`) | Not deployed to any cloud |
+
+**BigQuery sandbox limits** ([Google's page](https://docs.cloud.google.com/bigquery/docs/sandbox)):
+- **Storage:** a lifetime allowance of 10 GiB, not restored when data is deleted. The dataset is 2.52 MiB (2,637,285 bytes), so even if every monthly reload counted against the allowance, it would last about 4,000 reloads.
+- **Queries:** 1 TiB of processed data a month. Every query in `src/bigquery_parity.py` is dry-run first and refused if the estimate passes 1 GB. It also runs with `maximum_bytes_billed` set to 1 GB, so BigQuery would refuse it rather than go over, even in a project with billing. Each parity query processed under 1.6 MB, but BigQuery counts a minimum of 10 MB per table read, so the whole check uses about 42 MB of the allowance.
+- **Expiry:** tables expire after 60 days. The monthly refresh reloads them, which restarts the clock.
+- **Writing:** no DML and no streaming inserts. `src/sync_bigquery.py` replaces each table with a load job (`WRITE_TRUNCATE`), and load jobs are free.
+
+Nothing here needs billing. The project is a sandbox because billing is off. If a billing account is ever activated for it, the sandbox limits stop applying, so check `gcloud billing projects describe <project-id>` before running anything new.
+
+### GitHub Actions to BigQuery without a key
+
+The sync in `monthly-refresh.yml` and `bigquery-sync.yml` uses direct Workload Identity
+Federation through `google-github-actions/auth@v3`. GitHub's OIDC token for the run is exchanged for
+a Google token that lasts at most 10 minutes. There is no service account and no key file. The
+setup, run once with `gcloud` (replace the values in angle brackets):
+
+```bash
+gcloud services enable iam.googleapis.com sts.googleapis.com --project=<project-id>
+
+gcloud iam workload-identity-pools create github --project=<project-id> --location=global \
+  --display-name="GitHub Actions"
+
+# admit tokens from this repository only
+gcloud iam workload-identity-pools providers create-oidc nyc-311-civic-analytics \
+  --project=<project-id> --location=global --workload-identity-pool=github \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref" \
+  --attribute-condition="assertion.repository == '<owner>/nyc-311-civic-analytics'"
+
+# run BigQuery jobs in the project
+gcloud projects add-iam-policy-binding <project-id> --role=roles/bigquery.jobUser --condition=None \
+  --member="principalSet://iam.googleapis.com/projects/<project-number>/locations/global/workloadIdentityPools/github/attribute.repository/<owner>/nyc-311-civic-analytics"
+```
+
+The repository also needs to write to the `nyc_311` dataset, and to nothing else. `bq add-iam-policy-binding -d`
+answered "This feature requires allowlisting" for the sandbox project, so that grant is a `WRITER`
+entry on the dataset's own access list instead. Add it with the BigQuery client's
+`AccessEntry(role="roles/bigquery.dataEditor", entity_type="iamMember", entity_id="principalSet://...")`
+and `update_dataset(dataset, ["access_entries"])`. Finally, save `GCP_PROJECT_ID` and
+`GCP_WORKLOAD_IDENTITY_PROVIDER` (`projects/<project-number>/locations/global/workloadIdentityPools/github/providers/nyc-311-civic-analytics`)
+as repository secrets. Without them, both workflows skip the sync.
+
+First run: GitHub Actions run 40245182725 authenticated this way and loaded 58,318 rows into 7 tables.
+
+### The container
+
+`Dockerfile` builds the Streamlit app from `python:3.12-slim`. It runs as a non-root user, serves
+Streamlit on `$PORT` (default 8080), and has a healthcheck on `/_stcore/health`. It installs only
+`requirements-app.txt`, which leaves out the training pipeline's scikit-learn, SciPy, and matplotlib.
+Measured: 211 MB compressed, 747 MiB unpacked on an Apple Silicon Mac, and 708 MB unpacked on GitHub's
+amd64 runner. Both pages and an offline Ask 311 answer work inside it. No secrets are baked in, so it
+always runs in offline mode.
