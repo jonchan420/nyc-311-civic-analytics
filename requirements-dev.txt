@@ -1,4 +1,4 @@
--r requirements.txt
+-r requirements-cloud.txt
 pytest==9.1.1
 # analyst/mcp_server.py, the optional MCP server; the Streamlit app doesn't need it
 mcp==2.3.0

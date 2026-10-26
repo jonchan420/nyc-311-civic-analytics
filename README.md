@@ -188,6 +188,19 @@ To test with a free local model instead of Claude, install [Ollama](https://olla
 (`brew install ollama`), run `ollama serve` and `ollama pull qwen3:8b`, then
 `python eval/run_eval.py --mode ollama`. See [eval/README.md](eval/README.md).
 
+To run the app in a container, or copy `data/live/` into BigQuery (both free; see
+"Where it runs" below):
+
+```bash
+docker build -t nyc-311-civic-analytics .
+docker run --rm -p 8080:8080 nyc-311-civic-analytics      # then open http://localhost:8080
+
+pip install -r requirements-cloud.txt
+gcloud auth application-default login                    # your own Google login; no key files
+GCP_PROJECT_ID=<your-project-id> python src/sync_bigquery.py     # load every table in data/live/
+GCP_PROJECT_ID=<your-project-id> python src/bigquery_parity.py   # same SQL in BigQuery and DuckDB
+```
+
 To turn on Claude in the Ask 311 page, copy `.streamlit/secrets.toml.example`
 to `.streamlit/secrets.toml` and fill in the key, a passcode, and the daily
 limits. Without it, the page runs offline.
@@ -228,6 +241,8 @@ data/equity/results/        reporting-gap results and robustness checks (tracked
 data/borough_population.csv 2020 Census borough populations (tracked in git)
 src/                        pipeline scripts, numbered by run order above
 analyst/                    Ask 311: router, tools, grounding check, model client, MCP server
+sql/                        dashboard aggregates in SQL that runs in both BigQuery and DuckDB
+Dockerfile                  the Streamlit app as a container (requirements-app.txt only)
 docs/knowledge/             method notes the assistant retrieves and cites
 docs/ARCHITECTURE.md        how Ask 311 works and where each safeguard is tested
 eval/                       evaluation questions, thresholds, runner, and every result
@@ -735,6 +750,23 @@ the rules routing and 10.0 with the model routing, on an M5 Mac with 16 GB.
 
 Claude mode hasn't been run against these questions yet, because that run
 makes paid API calls.
+
+## Where it runs, all on free tiers
+
+| Piece | Where |
+|---|---|
+| Dashboard and Ask 311 | Streamlit Community Cloud |
+| Monthly refresh, forecast scoring, tests, Docker build | GitHub Actions |
+| A copy of `data/live/` | BigQuery sandbox (a Google Cloud project with billing turned off) |
+| The container | Your own machine; it isn't deployed anywhere |
+
+`src/sync_bigquery.py` loaded 58,318 rows into 7 BigQuery tables (2.52 MiB). It uses free load
+jobs, because the sandbox allows no inserts or updates. The monthly refresh reloads them
+before the sandbox's 60-day expiry, signing in to Google with Workload Identity Federation instead
+of a stored key. `src/bigquery_parity.py` runs three of the dashboard's aggregates as the same SQL in
+BigQuery and in DuckDB; all three matched row for row. Each query is dry-run first and capped at 1 GB,
+and each processed under 1.6 MB. The Docker image is 211 MB compressed. Limits, setup
+commands, and what would cost money: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#where-it-runs-for-free).
 
 ## Data responsibility
 
